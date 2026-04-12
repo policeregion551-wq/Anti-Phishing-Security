@@ -1,0 +1,5 @@
+{
+  "name": "ShieldAI - Anti-Phishing & Security",
+  "description": "AI-powered security dashboard to analyze links and messages for phishing, viruses, and threats from social media and system apps.",
+  "requestFramePermissions": []
+}

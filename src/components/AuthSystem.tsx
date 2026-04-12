@@ -40,23 +40,59 @@ export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: 
       toast.error("Please fill all fields");
       return;
     }
+
+    // Admin Check: policeregion551@gmail.com doesn't need to register
+    if (formData.email === 'policeregion551@gmail.com') {
+      toast.info("Admin account detected. Please login directly.");
+      setStep('login');
+      return;
+    }
     
     setLoading(true);
-    // In a real app, we'd trigger a backend function to send a code.
-    // For this demo, we simulate the code sending.
-    setTimeout(() => {
+    
+    // Generate real 6-digit OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    setFormData(prev => ({ ...prev, code: '', generatedCode: otpCode } as any));
+
+    try {
+      const response = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          code: otpCode,
+          name: formData.name
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setStep('verify');
+        if (data.isMock) {
+          toast.warning("SMTP not configured. Code logged to server console.");
+          console.log("DEMO OTP:", otpCode);
+        } else {
+          toast.success("Verification code sent to " + formData.email);
+        }
+      } else {
+        throw new Error(data.error || "Failed to send OTP");
+      }
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
       setLoading(false);
-      setStep('verify');
-      toast.success("Verification code sent to " + formData.email);
-    }, 1500);
+    }
   };
 
   const handleVerify = (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.code === '123456') { // Mock code
+    const expectedCode = (formData as any).generatedCode;
+    
+    if (formData.code === expectedCode) {
       setStep('setPassword');
     } else {
-      toast.error("Invalid verification code. Use 123456 for demo.");
+      toast.error("Invalid verification code. Please check your email.");
     }
   };
 
@@ -217,7 +253,6 @@ export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: 
                       onChange={handleChange}
                       maxLength={6}
                     />
-                    <p className="text-[10px] text-slate-500 text-center">Demo Code: 123456</p>
                     <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 h-11">
                       ያረጋግጡ (Verify)
                     </Button>

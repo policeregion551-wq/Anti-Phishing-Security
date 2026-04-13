@@ -50,33 +50,41 @@ export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: 
     
     setLoading(true);
     
-    // Generate real 6-digit OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setFormData(prev => ({ ...prev, code: '', generatedCode: otpCode } as any));
+    // Generate real 6-digit OTP for Email
+    const emailOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate real 6-digit OTP for Phone
+    const phoneOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    setFormData(prev => ({ 
+      ...prev, 
+      code: '', 
+      generatedEmailCode: emailOtp,
+      generatedPhoneCode: phoneOtp 
+    } as any));
 
     try {
-      const response = await fetch('/api/send-otp', {
+      // Send Email OTP
+      const emailRes = await fetch('/api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: formData.email,
-          code: otpCode,
-          name: formData.name
-        })
+        body: JSON.stringify({ email: formData.email, code: emailOtp, name: formData.name })
       });
 
-      const data = await response.json();
+      // Send Phone OTP
+      const phoneRes = await fetch('/api/send-phone-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: formData.phone, code: phoneOtp })
+      });
 
-      if (data.success) {
+      const emailData = await emailRes.json();
+      const phoneData = await phoneRes.json();
+
+      if (emailData.success && phoneData.success) {
         setStep('verify');
-        if (data.isMock) {
-          toast.warning("SMTP not configured. Code logged to server console.");
-          console.log("DEMO OTP:", otpCode);
-        } else {
-          toast.success("Verification code sent to " + formData.email);
-        }
+        toast.success("Verification codes sent to Email and Phone");
       } else {
-        throw new Error(data.error || "Failed to send OTP");
+        throw new Error("Failed to send verification codes");
       }
     } catch (error: any) {
       toast.error(error.message);
@@ -85,14 +93,17 @@ export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: 
     }
   };
 
+  const [phoneCode, setPhoneCode] = useState('');
+
   const handleVerify = (e: React.FormEvent) => {
     e.preventDefault();
-    const expectedCode = (formData as any).generatedCode;
+    const expectedEmailCode = (formData as any).generatedEmailCode;
+    const expectedPhoneCode = (formData as any).generatedPhoneCode;
     
-    if (formData.code === expectedCode) {
+    if (formData.code === expectedEmailCode && phoneCode === expectedPhoneCode) {
       setStep('setPassword');
     } else {
-      toast.error("Invalid verification code. Please check your email.");
+      toast.error("Invalid verification codes. Please check your email and phone.");
     }
   };
 
@@ -139,10 +150,31 @@ export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    // Hardcoded Admin Check for specific credentials
+    if (formData.email === 'policeregion551@gmail.com' && formData.password === 'Po12345@') {
+      toast.success("Admin Login Successful!");
+      onAuthComplete({
+        uid: 'admin-1',
+        email: 'policeregion551@gmail.com',
+        displayName: 'System Administrator',
+        role: 'admin'
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
+      // Fetch user role from Firestore
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      const userData = userDoc.data();
+      
       toast.success("Welcome back!");
-      onAuthComplete(userCredential.user);
+      onAuthComplete({
+        ...userCredential.user,
+        role: userData?.role || 'user'
+      });
     } catch (error: any) {
       toast.error("Invalid email or password");
     } finally {
@@ -240,19 +272,32 @@ export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: 
             >
               <Card className="bg-slate-900/50 border-white/5 backdrop-blur-xl">
                 <CardHeader>
-                  <CardTitle className="text-xl text-white">ኢሜልዎን ያረጋግጡ (Verify Email)</CardTitle>
-                  <CardDescription>ወደ {formData.email} የተላከውን ኮድ ያስገቡ</CardDescription>
+                  <CardTitle className="text-xl text-white">ማረጋገጫ (Verification)</CardTitle>
+                  <CardDescription>ወደ ኢሜልዎ እና ስልክዎ የተላከውን ኮድ ያስገቡ</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleVerify} className="space-y-4">
-                    <Input 
-                      name="code"
-                      placeholder="የማረጋገጫ ኮድ (Verification Code)" 
-                      className="text-center text-2xl tracking-[1em] bg-black/20 border-white/10 text-white h-14"
-                      value={formData.code}
-                      onChange={handleChange}
-                      maxLength={6}
-                    />
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400 uppercase font-bold">Email Code</label>
+                      <Input 
+                        name="code"
+                        placeholder="Email OTP" 
+                        className="text-center text-xl tracking-[0.5em] bg-black/20 border-white/10 text-white h-12"
+                        value={formData.code}
+                        onChange={handleChange}
+                        maxLength={6}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-400 uppercase font-bold">Phone Code</label>
+                      <Input 
+                        placeholder="Phone OTP" 
+                        className="text-center text-xl tracking-[0.5em] bg-black/20 border-white/10 text-white h-12"
+                        value={phoneCode}
+                        onChange={(e) => setPhoneCode(e.target.value)}
+                        maxLength={6}
+                      />
+                    </div>
                     <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 h-11">
                       ያረጋግጡ (Verify)
                     </Button>

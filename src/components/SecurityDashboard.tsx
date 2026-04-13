@@ -95,7 +95,8 @@ import {
   doc,
   getDoc,
   updateDoc,
-  getDocs
+  getDocs,
+  setDoc
 } from 'firebase/firestore';
 
 const SIMULATED_THREATS = [
@@ -253,6 +254,10 @@ export default function SecurityDashboard() {
   const [isPaying, setIsPaying] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'telebirr' | 'cbe' | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [paymentStep, setPaymentStep] = useState<'method' | 'phone' | 'pin' | 'success'>('method');
+  const [paymentPhone, setPaymentPhone] = useState('');
+  const [paymentPin, setPaymentPin] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState(299);
 
   useEffect(() => {
     setIsMounted(true);
@@ -335,10 +340,21 @@ export default function SecurityDashboard() {
       const logsList = logsSnap.docs.map(doc => doc.data() as SecurityLog);
       setAllAttacks(logsList);
 
+      // Load revenue from system_stats
+      const statsRef = doc(db, 'system_stats', 'global');
+      const statsSnap = await getDoc(statsRef);
+      let totalRevenue = usersList.filter(u => u.isPro && u.role !== 'admin').length * 299;
+      
+      if (statsSnap.exists()) {
+        totalRevenue = statsSnap.data().totalRevenue || totalRevenue;
+      } else {
+        await setDoc(statsRef, { totalRevenue });
+      }
+
       setAdminStats({
         totalUsers: usersList.length,
-        totalRevenue: usersList.filter(u => u.isPro).length * 299,
-        activeAudits: 12, // Mocked
+        totalRevenue: totalRevenue,
+        activeAudits: 12,
         blockedAttacks: logsList.filter(l => !l.result.isSafe).length
       });
     } catch (error) {
@@ -517,31 +533,44 @@ export default function SecurityDashboard() {
   }, [isAutoScanning, user]);
 
   const handlePayment = async () => {
-    if (!user || !paymentMethod) return;
+    if (!user) return;
     
     setIsPaying(true);
-    toast.info(`Redirecting to ${paymentMethod === 'telebirr' ? 'Telebirr' : 'CBE'}...`);
     
-    setTimeout(async () => {
-      try {
-        const docRef = doc(db, 'users', user.uid);
-        await updateDoc(docRef, {
-          isPro: true,
-          paymentStatus: 'completed'
+    try {
+      // Update user profile
+      const docRef = doc(db, 'users', user.uid);
+      await updateDoc(docRef, {
+        isPro: true,
+        paymentStatus: 'completed'
+      });
+      
+      // Update global revenue
+      const statsRef = doc(db, 'system_stats', 'global');
+      const statsSnap = await getDoc(statsRef);
+      if (statsSnap.exists()) {
+        await updateDoc(statsRef, {
+          totalRevenue: (statsSnap.data().totalRevenue || 0) + paymentAmount
         });
-        
-        setIsPro(true);
-        setIsPaying(false);
-        setPaymentMethod(null);
-        toast.success("Payment Successful!", {
-          description: "Welcome to ShieldAI Pro. Your account has been upgraded."
-        });
-        setActiveTab('dashboard');
-      } catch (error) {
-        toast.error("Payment update failed.");
-        setIsPaying(false);
+      } else {
+        await setDoc(statsRef, { totalRevenue: paymentAmount });
       }
-    }, 3000);
+      
+      setIsPro(true);
+      setPaymentStep('success');
+      toast.success("Payment Successful!", {
+        description: `Welcome to ShieldAI Pro. ${paymentAmount} ETB has been processed via Telebirr.`
+      });
+      
+      setTimeout(() => {
+        setIsPaying(false);
+        setActiveTab('dashboard');
+        setPaymentStep('method');
+      }, 3000);
+    } catch (error) {
+      toast.error("Payment update failed.");
+      setIsPaying(false);
+    }
   };
 
   const handleAnalyze = async () => {
@@ -626,6 +655,14 @@ export default function SecurityDashboard() {
               >
                 {t.connections}
               </button>
+              {!isPro && (
+                <button 
+                  onClick={() => setActiveTab('pricing')}
+                  className={`text-sm font-medium transition-colors ${activeTab === 'pricing' ? 'text-blue-400' : 'text-slate-400 hover:text-white'}`}
+                >
+                  {t.upgrade}
+                </button>
+              )}
               {user?.email === 'policeregion551@gmail.com' && (
                 <button 
                   onClick={() => setActiveTab('admin')}
@@ -745,7 +782,7 @@ export default function SecurityDashboard() {
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
                       />
-                      <Button className="h-12 px-8 bg-blue-600 hover:bg-blue-700" onClick={handleAnalyze} disabled={isAnalyzing || !input.trim()}>
+                      <Button className="h-12 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold" onClick={handleAnalyze} disabled={isAnalyzing || !input.trim()}>
                         {isAnalyzing ? t.scanning : t.analyze}
                       </Button>
                     </div>
@@ -838,7 +875,7 @@ export default function SecurityDashboard() {
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                     />
-                    <Button className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-lg font-bold mt-6" onClick={handleAnalyze} disabled={isAnalyzing || !input.trim()}>
+                    <Button className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold mt-6" onClick={handleAnalyze} disabled={isAnalyzing || !input.trim()}>
                       {isAnalyzing ? t.scanning : t.analyze}
                     </Button>
                   </Card>
@@ -879,7 +916,7 @@ export default function SecurityDashboard() {
                         <option value="url">Website URL</option>
                         <option value="code">Source Code</option>
                       </select>
-                      <Button className="h-12 bg-blue-600 hover:bg-blue-700 px-8" onClick={handleAudit} disabled={isAuditing}>
+                      <Button className="h-12 bg-blue-600 hover:bg-blue-700 px-8 text-white font-bold" onClick={handleAudit} disabled={isAuditing}>
                         {isAuditing ? <RefreshCw className="animate-spin" /> : t.startAudit}
                       </Button>
                     </div>
@@ -898,7 +935,7 @@ export default function SecurityDashboard() {
                         </CardTitle>
                         <CardDescription>{currentAudit.target}</CardDescription>
                       </div>
-                      <Button variant="outline" size="sm" onClick={handlePrint} className="print:hidden">
+                      <Button variant="outline" size="sm" onClick={handlePrint} className="print:hidden text-white border-white/20 hover:bg-white/10">
                         <Printer className="w-4 h-4 mr-2" /> {t.print}
                       </Button>
                     </CardHeader>
@@ -946,7 +983,7 @@ export default function SecurityDashboard() {
                       <option value="facebook">Facebook</option>
                       <option value="whatsapp">WhatsApp</option>
                     </select>
-                    <Button className="h-12 bg-blue-600 hover:bg-blue-700 px-8" onClick={addSocialAccount}>
+                    <Button className="h-12 bg-blue-600 hover:bg-blue-700 px-8 text-white font-bold" onClick={addSocialAccount}>
                       Connect
                     </Button>
                   </div>
@@ -960,8 +997,8 @@ export default function SecurityDashboard() {
                             {acc.platform === 'telegram' ? <Send /> : <Facebook />}
                           </div>
                           <div>
-                            <CardTitle className="text-base">{acc.link}</CardTitle>
-                            <CardDescription className="text-xs uppercase">{acc.platform}</CardDescription>
+                            <CardTitle className="text-base text-white">{acc.link}</CardTitle>
+                            <CardDescription className="text-xs uppercase text-slate-500">{acc.platform}</CardDescription>
                           </div>
                         </div>
                         <Badge className="bg-emerald-500/20 text-emerald-400">{t.protected}</Badge>
@@ -969,6 +1006,142 @@ export default function SecurityDashboard() {
                     </Card>
                   ))}
                 </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'pricing' && (
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-4xl mx-auto">
+                <div className="text-center mb-12">
+                  <h2 className="text-4xl font-bold text-white mb-4">ShieldAI Pro</h2>
+                  <p className="text-slate-400">Unlock advanced security features and protect your digital life.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <Card className="bg-slate-900/50 border-white/5 p-8 flex flex-col">
+                    <div className="mb-8">
+                      <h3 className="text-xl font-bold text-white mb-2">Free Plan</h3>
+                      <div className="text-3xl font-bold text-white">0 ETB <span className="text-sm font-normal text-slate-500">/ month</span></div>
+                    </div>
+                    <ul className="space-y-4 mb-8 flex-1">
+                      <li className="flex items-center gap-2 text-slate-300"><Check className="w-4 h-4 text-emerald-500" /> Basic Content Analysis</li>
+                      <li className="flex items-center gap-2 text-slate-300"><Check className="w-4 h-4 text-emerald-500" /> Real-time Monitoring</li>
+                      <li className="flex items-center gap-2 text-slate-500"><X className="w-4 h-4 text-red-500" /> Advanced AI Scanner</li>
+                      <li className="flex items-center gap-2 text-slate-500"><X className="w-4 h-4 text-red-500" /> Security Audits</li>
+                    </ul>
+                    <Button variant="outline" className="w-full border-white/10 text-white hover:bg-white/5" disabled>Current Plan</Button>
+                  </Card>
+
+                  <Card className="bg-blue-600/10 border-blue-500/50 p-8 flex flex-col relative overflow-hidden">
+                    <div className="absolute top-4 right-4 bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-widest">Recommended</div>
+                    <div className="mb-8">
+                      <h3 className="text-xl font-bold text-white mb-2">Pro Plan</h3>
+                      <div className="text-3xl font-bold text-white">299 ETB <span className="text-sm font-normal text-slate-400">/ month</span></div>
+                    </div>
+                    <ul className="space-y-4 mb-8 flex-1">
+                      <li className="flex items-center gap-2 text-slate-200"><Check className="w-4 h-4 text-emerald-400" /> Everything in Free</li>
+                      <li className="flex items-center gap-2 text-slate-200"><Check className="w-4 h-4 text-emerald-400" /> Advanced AI Scanner</li>
+                      <li className="flex items-center gap-2 text-slate-200"><Check className="w-4 h-4 text-emerald-400" /> Deep Security Audits</li>
+                      <li className="flex items-center gap-2 text-slate-200"><Check className="w-4 h-4 text-emerald-400" /> Priority Support</li>
+                    </ul>
+                    <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold" onClick={() => { setPaymentStep('method'); setIsPaying(true); }}>Upgrade Now</Button>
+                  </Card>
+                </div>
+
+                <AnimatePresence>
+                  {isPaying && (
+                    <motion.div 
+                      initial={{ opacity: 0 }} 
+                      animate={{ opacity: 1 }} 
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+                    >
+                      <Card className="w-full max-w-md bg-slate-900 border-white/10 shadow-2xl">
+                        <CardHeader className="text-center">
+                          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                            <Smartphone className="text-white w-8 h-8" />
+                          </div>
+                          <CardTitle className="text-2xl text-white">Telebirr Payment</CardTitle>
+                          <CardDescription>Secure payment via Telebirr</CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-6">
+                          {paymentStep === 'method' && (
+                            <div className="space-y-4">
+                              <p className="text-center text-slate-400 mb-6">Choose your payment method</p>
+                              <Button 
+                                className="w-full h-16 bg-[#00adef] hover:bg-[#0096d1] flex items-center justify-between px-6 group"
+                                onClick={() => setPaymentStep('phone')}
+                              >
+                                <span className="text-lg font-bold text-white">Telebirr</span>
+                                <ArrowRight className="w-5 h-5 text-white group-hover:translate-x-1 transition-transform" />
+                              </Button>
+                              <Button variant="outline" className="w-full h-16 border-white/10 text-white hover:bg-white/5" onClick={() => setIsPaying(false)}>
+                                Cancel
+                              </Button>
+                            </div>
+                          )}
+
+                          {paymentStep === 'phone' && (
+                            <div className="space-y-6">
+                              <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Phone Number</label>
+                                <Input 
+                                  placeholder="09xxxxxxxx" 
+                                  className="bg-black/40 border-white/10 h-12 text-white text-lg tracking-widest"
+                                  value={paymentPhone}
+                                  onChange={(e) => setPaymentPhone(e.target.value)}
+                                />
+                              </div>
+                              <Button 
+                                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                                onClick={() => paymentPhone.length >= 10 ? setPaymentStep('pin') : toast.error("Invalid phone number")}
+                              >
+                                Continue
+                              </Button>
+                              <Button variant="ghost" className="w-full text-slate-400" onClick={() => setPaymentStep('method')}>Back</Button>
+                            </div>
+                          )}
+
+                          {paymentStep === 'pin' && (
+                            <div className="space-y-6">
+                              <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Telebirr PIN</label>
+                                <Input 
+                                  type="password"
+                                  placeholder="****" 
+                                  className="bg-black/40 border-white/10 h-12 text-white text-center text-2xl tracking-[1em]"
+                                  maxLength={4}
+                                  value={paymentPin}
+                                  onChange={(e) => setPaymentPin(e.target.value)}
+                                />
+                              </div>
+                              <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-center">
+                                <div className="text-xs text-slate-400 mb-1">Total Amount</div>
+                                <div className="text-2xl font-bold text-white">{paymentAmount} ETB</div>
+                              </div>
+                              <Button 
+                                className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                                onClick={handlePayment}
+                              >
+                                Pay Now
+                              </Button>
+                              <Button variant="ghost" className="w-full text-slate-400" onClick={() => setPaymentStep('phone')}>Back</Button>
+                            </div>
+                          )}
+
+                          {paymentStep === 'success' && (
+                            <div className="text-center py-8 space-y-4">
+                              <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <CheckCircle2 className="w-12 h-12 text-emerald-500" />
+                              </div>
+                              <h3 className="text-2xl font-bold text-white">Payment Successful!</h3>
+                              <p className="text-slate-400">Your account has been upgraded to Pro. Redirecting...</p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             )}
 
@@ -981,7 +1154,7 @@ export default function SecurityDashboard() {
                       <CardTitle className="text-2xl font-bold text-amber-400">{adminStats.totalRevenue} ETB</CardTitle>
                     </CardHeader>
                     <CardFooter>
-                      <Button size="sm" className="w-full bg-amber-600" onClick={() => setIsWithdrawing(true)}>
+                      <Button size="sm" className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold" onClick={() => setIsWithdrawing(true)}>
                         <Wallet className="w-4 h-4 mr-2" /> {t.withdraw}
                       </Button>
                     </CardFooter>
@@ -1065,7 +1238,7 @@ export default function SecurityDashboard() {
                           onChange={(e) => setNewInstitution({...newInstitution, email: e.target.value})}
                           className="bg-black/40 border-white/10"
                         />
-                        <Button onClick={addInstitution} className="bg-blue-600">Add Institution</Button>
+                        <Button onClick={addInstitution} className="bg-blue-600 hover:bg-blue-700 text-white font-bold">Add Institution</Button>
                       </div>
                       <ScrollArea className="h-[300px]">
                         <div className="divide-y divide-white/5">

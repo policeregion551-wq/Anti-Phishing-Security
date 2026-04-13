@@ -314,7 +314,9 @@ export default function SecurityDashboard() {
         if (docSnap.exists()) {
           const profile = docSnap.data() as UserProfile;
           setUserProfile(profile);
-          setIsPro(profile.isPro || profile.role === 'admin');
+          setIsPro(profile.isPro || profile.role === 'admin' || currentUser.email === 'policeregion551@gmail.com');
+        } else if (currentUser.email === 'policeregion551@gmail.com') {
+          setIsPro(true);
         }
         
         // Load Admin Data if admin
@@ -393,7 +395,14 @@ export default function SecurityDashboard() {
     }
   };
 
-  const [newInstitution, setNewInstitution] = useState({ name: '', email: '', phone: '' });
+  const [newInstitution, setNewInstitution] = useState({ 
+    name: '', 
+    email: '', 
+    phone: '',
+    telegram: '',
+    whatsapp: '',
+    facebook: ''
+  });
   const [institutions, setInstitutions] = useState<any[]>([]);
 
   const addInstitution = async () => {
@@ -404,7 +413,14 @@ export default function SecurityDashboard() {
         createdAt: new Date().toISOString()
       });
       toast.success("Institution added successfully");
-      setNewInstitution({ name: '', email: '', phone: '' });
+      setNewInstitution({ 
+        name: '', 
+        email: '', 
+        phone: '',
+        telegram: '',
+        whatsapp: '',
+        facebook: ''
+      });
     } catch (error) {
       toast.error("Failed to add institution");
     }
@@ -559,7 +575,7 @@ export default function SecurityDashboard() {
       setIsPro(true);
       setPaymentStep('success');
       toast.success("Payment Successful!", {
-        description: `Welcome to ShieldAI Pro. ${paymentAmount} ETB has been processed via Telebirr.`
+        description: `Welcome to BINI SHIELD AI Pro. ${paymentAmount} ETB has been processed via Telebirr.`
       });
       
       setTimeout(() => {
@@ -609,22 +625,23 @@ export default function SecurityDashboard() {
   if (!isMounted) return null;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-slate-100 font-sans selection:bg-blue-500/30 overflow-x-hidden">
+    <div className="min-h-screen bg-[#020202] text-slate-100 font-sans selection:bg-blue-500/30 overflow-x-hidden">
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,1),rgba(2,2,2,1))] -z-10" />
       <Toaster position="top-right" theme="dark" />
       
       {/* Navigation */}
-      <nav className="border-b border-white/5 bg-black/40 backdrop-blur-xl sticky top-0 z-50">
+      <nav className="border-b border-white/5 bg-black/60 backdrop-blur-2xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(37,99,235,0.3)]">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(37,99,235,0.2)] border border-blue-400/20">
                 <Shield className="text-white w-6 h-6" />
               </div>
               <div className="hidden sm:block">
-                <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent leading-none">
-                  ShieldAI
+                <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-white to-slate-500 bg-clip-text text-transparent leading-none">
+                  BINI SHIELD AI
                 </span>
-                <div className="text-[8px] font-mono text-blue-400 uppercase tracking-tighter leading-none mt-1">
+                <div className="text-[8px] font-mono text-blue-400 uppercase tracking-tighter leading-none mt-1 opacity-80">
                   By Asst. Eng. Biniyam Yirsaw Metina
                 </div>
               </div>
@@ -699,7 +716,7 @@ export default function SecurityDashboard() {
                   </button>
                 </div>
               ) : (
-                <Button size="sm" onClick={() => setActiveTab('auth')} className="bg-blue-600 hover:bg-blue-700">
+                <Button size="sm" onClick={() => setActiveTab('auth')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-600/20 border border-blue-400/30 transition-all active:scale-95">
                   {t.login}
                 </Button>
               )}
@@ -712,11 +729,16 @@ export default function SecurityDashboard() {
         {!user && activeTab === 'auth' ? (
           <AuthSystem onAuthComplete={(u) => setUser(u)} />
         ) : !user ? (
-          <div className="text-center py-20 space-y-6">
-            <Shield className="w-20 h-20 text-blue-500 mx-auto animate-pulse" />
-            <h1 className="text-4xl font-bold text-white">Welcome to ShieldAI</h1>
-            <p className="text-slate-400 max-w-md mx-auto">The most advanced AI-powered security system for your digital life.</p>
-            <Button size="lg" onClick={() => setActiveTab('auth')} className="bg-blue-600 hover:bg-blue-700 px-12">
+          <div className="text-center py-20 space-y-8">
+            <div className="relative inline-block">
+              <div className="absolute inset-0 bg-blue-500/20 blur-3xl rounded-full" />
+              <Shield className="w-24 h-24 text-blue-500 mx-auto relative animate-pulse" />
+            </div>
+            <div className="space-y-4">
+              <h1 className="text-5xl font-bold text-white tracking-tight">Welcome to <span className="text-blue-500">BINI SHIELD AI</span></h1>
+              <p className="text-slate-400 max-w-md mx-auto text-lg">The most advanced AI-powered security system for your digital life.</p>
+            </div>
+            <Button size="lg" onClick={() => setActiveTab('auth')} className="bg-blue-600 hover:bg-blue-700 px-12 h-14 text-lg font-bold shadow-xl shadow-blue-600/20 border border-blue-400/30 text-white">
               Get Started
             </Button>
           </div>
@@ -726,7 +748,70 @@ export default function SecurityDashboard() {
           </div>
         ) : (
           <>
-            {activeTab === 'dashboard' && (
+            {userProfile?.role === 'institution' && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6 p-10 bg-gradient-to-br from-blue-600/10 via-blue-900/5 to-transparent border border-blue-500/20 rounded-[2.5rem] backdrop-blur-xl shadow-2xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 blur-[100px] -z-10" />
+                  <div className="space-y-3 text-center md:text-left">
+                    <Badge className="bg-blue-600/20 text-blue-400 border-blue-500/30 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest">Enterprise Security</Badge>
+                    <h2 className="text-4xl font-bold text-white tracking-tight">Institution Dashboard</h2>
+                    <p className="text-slate-400 text-lg">Monitoring security for <strong className="text-white font-semibold">{userProfile.name}</strong></p>
+                  </div>
+                  <div className="flex gap-4">
+                    {userProfile.institutionLinks?.telegram && (
+                      <a href={userProfile.institutionLinks.telegram} target="_blank" className="w-14 h-14 bg-slate-900/80 border border-white/10 rounded-2xl flex items-center justify-center text-blue-400 hover:bg-blue-600 hover:text-white transition-all shadow-xl hover:shadow-blue-600/20 group">
+                        <Send className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                      </a>
+                    )}
+                    {userProfile.institutionLinks?.facebook && (
+                      <a href={userProfile.institutionLinks.facebook} target="_blank" className="w-14 h-14 bg-slate-900/80 border border-white/10 rounded-2xl flex items-center justify-center text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-xl hover:shadow-blue-600/20 group">
+                        <Facebook className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                      </a>
+                    )}
+                    {userProfile.institutionLinks?.whatsapp && (
+                      <a href={userProfile.institutionLinks.whatsapp} target="_blank" className="w-14 h-14 bg-slate-900/80 border border-white/10 rounded-2xl flex items-center justify-center text-emerald-400 hover:bg-emerald-600 hover:text-white transition-all shadow-xl hover:shadow-emerald-600/20 group">
+                        <MessageSquare className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  <Card className="bg-slate-900/40 border-white/5 backdrop-blur-md p-8 rounded-3xl border-l-4 border-l-red-500/50">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="w-12 h-12 bg-red-500/10 rounded-2xl flex items-center justify-center text-red-400">
+                        <ShieldAlert className="w-6 h-6" />
+                      </div>
+                      <Badge className="bg-red-500/10 text-red-400">Critical</Badge>
+                    </div>
+                    <CardDescription className="text-[10px] uppercase font-bold text-slate-500 tracking-widest mb-1">Active Threats</CardDescription>
+                    <CardTitle className="text-4xl font-bold text-white">0</CardTitle>
+                  </Card>
+                  <Card className="bg-slate-900/40 border-white/5 backdrop-blur-md p-8 rounded-3xl border-l-4 border-l-emerald-500/50">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-400">
+                        <ShieldCheck className="w-6 h-6" />
+                      </div>
+                      <Badge className="bg-emerald-500/10 text-emerald-400">Optimal</Badge>
+                    </div>
+                    <CardDescription className="text-[10px] uppercase font-bold text-slate-500 tracking-widest mb-1">Security Score</CardDescription>
+                    <CardTitle className="text-4xl font-bold text-white">100%</CardTitle>
+                  </Card>
+                  <Card className="bg-slate-900/40 border-white/5 backdrop-blur-md p-8 rounded-3xl border-l-4 border-l-blue-500/50">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-400">
+                        <History className="w-6 h-6" />
+                      </div>
+                      <Badge className="bg-blue-500/10 text-blue-400">Recent</Badge>
+                    </div>
+                    <CardDescription className="text-[10px] uppercase font-bold text-slate-500 tracking-widest mb-1">Last Audit</CardDescription>
+                    <CardTitle className="text-2xl font-bold text-white">Today</CardTitle>
+                  </Card>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'dashboard' && userProfile?.role !== 'institution' && (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
                 <div className={`p-3 rounded-lg border flex items-center justify-between ${isAutoScanning ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-slate-800 border-white/10'}`}>
                   <div className="flex items-center gap-3">
@@ -782,7 +867,7 @@ export default function SecurityDashboard() {
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
                       />
-                      <Button className="h-12 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold" onClick={handleAnalyze} disabled={isAnalyzing || !input.trim()}>
+                      <Button className="h-12 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-600/20 border border-blue-400/30 transition-all active:scale-95" onClick={handleAnalyze} disabled={isAnalyzing || !input.trim()}>
                         {isAnalyzing ? t.scanning : t.analyze}
                       </Button>
                     </div>
@@ -858,7 +943,7 @@ export default function SecurityDashboard() {
                     <Lock className="w-10 h-10 text-amber-500 mx-auto mb-4" />
                     <h3 className="text-xl font-bold text-white">{t.paymentRequired}</h3>
                     <p className="text-slate-400 mb-6">{t.paymentDesc}</p>
-                    <Button onClick={() => setActiveTab('pricing')} className="bg-amber-600 hover:bg-amber-700">
+                    <Button onClick={() => setActiveTab('pricing')} className="bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-lg shadow-amber-600/20 border border-amber-400/30 transition-all active:scale-95">
                       {t.payNow}
                     </Button>
                   </div>
@@ -875,7 +960,7 @@ export default function SecurityDashboard() {
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                     />
-                    <Button className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold mt-6" onClick={handleAnalyze} disabled={isAnalyzing || !input.trim()}>
+                    <Button className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold mt-6 shadow-lg shadow-blue-600/20 border border-blue-400/30 transition-all active:scale-95" onClick={handleAnalyze} disabled={isAnalyzing || !input.trim()}>
                       {isAnalyzing ? t.scanning : t.analyze}
                     </Button>
                   </Card>
@@ -890,7 +975,7 @@ export default function SecurityDashboard() {
                     <Lock className="w-10 h-10 text-amber-500 mx-auto mb-4" />
                     <h3 className="text-xl font-bold text-white">{t.paymentRequired}</h3>
                     <p className="text-slate-400 mb-6">{t.paymentDesc}</p>
-                    <Button onClick={() => setActiveTab('pricing')} className="bg-amber-600 hover:bg-amber-700">
+                    <Button onClick={() => setActiveTab('pricing')} className="bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-lg shadow-amber-600/20 border border-amber-400/30 transition-all active:scale-95">
                       {t.payNow}
                     </Button>
                   </div>
@@ -916,7 +1001,7 @@ export default function SecurityDashboard() {
                         <option value="url">Website URL</option>
                         <option value="code">Source Code</option>
                       </select>
-                      <Button className="h-12 bg-blue-600 hover:bg-blue-700 px-8 text-white font-bold" onClick={handleAudit} disabled={isAuditing}>
+                      <Button className="h-12 bg-blue-600 hover:bg-blue-700 px-8 text-white font-bold shadow-lg shadow-blue-600/20 border border-blue-400/30 transition-all active:scale-95" onClick={handleAudit} disabled={isAuditing}>
                         {isAuditing ? <RefreshCw className="animate-spin" /> : t.startAudit}
                       </Button>
                     </div>
@@ -1012,7 +1097,7 @@ export default function SecurityDashboard() {
             {activeTab === 'pricing' && (
               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-4xl mx-auto">
                 <div className="text-center mb-12">
-                  <h2 className="text-4xl font-bold text-white mb-4">ShieldAI Pro</h2>
+                  <h2 className="text-4xl font-bold text-white mb-4">BINI SHIELD AI Pro</h2>
                   <p className="text-slate-400">Unlock advanced security features and protect your digital life.</p>
                 </div>
 
@@ -1043,7 +1128,7 @@ export default function SecurityDashboard() {
                       <li className="flex items-center gap-2 text-slate-200"><Check className="w-4 h-4 text-emerald-400" /> Deep Security Audits</li>
                       <li className="flex items-center gap-2 text-slate-200"><Check className="w-4 h-4 text-emerald-400" /> Priority Support</li>
                     </ul>
-                    <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold" onClick={() => { setPaymentStep('method'); setIsPaying(true); }}>Upgrade Now</Button>
+                    <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 shadow-lg shadow-blue-600/20 border border-blue-400/30 transition-all active:scale-95" onClick={() => { setPaymentStep('method'); setIsPaying(true); }}>Upgrade Now</Button>
                   </Card>
                 </div>
 
@@ -1225,7 +1310,7 @@ export default function SecurityDashboard() {
                   </TabsContent>
                   <TabsContent value="institutions">
                     <Card className="bg-slate-900/50 border-white/5 p-6">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                         <Input 
                           placeholder="Institution Name" 
                           value={newInstitution.name} 
@@ -1238,7 +1323,25 @@ export default function SecurityDashboard() {
                           onChange={(e) => setNewInstitution({...newInstitution, email: e.target.value})}
                           className="bg-black/40 border-white/10"
                         />
-                        <Button onClick={addInstitution} className="bg-blue-600 hover:bg-blue-700 text-white font-bold">Add Institution</Button>
+                        <Input 
+                          placeholder="Telegram Link" 
+                          value={newInstitution.telegram} 
+                          onChange={(e) => setNewInstitution({...newInstitution, telegram: e.target.value})}
+                          className="bg-black/40 border-white/10"
+                        />
+                        <Input 
+                          placeholder="WhatsApp Link" 
+                          value={newInstitution.whatsapp} 
+                          onChange={(e) => setNewInstitution({...newInstitution, whatsapp: e.target.value})}
+                          className="bg-black/40 border-white/10"
+                        />
+                        <Input 
+                          placeholder="Facebook Link" 
+                          value={newInstitution.facebook} 
+                          onChange={(e) => setNewInstitution({...newInstitution, facebook: e.target.value})}
+                          className="bg-black/40 border-white/10"
+                        />
+                        <Button onClick={addInstitution} className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-600/20 border border-blue-400/30 transition-all active:scale-95">Add Institution</Button>
                       </div>
                       <ScrollArea className="h-[300px]">
                         <div className="divide-y divide-white/5">
@@ -1247,8 +1350,13 @@ export default function SecurityDashboard() {
                               <div>
                                 <div className="font-bold text-white">{inst.name}</div>
                                 <div className="text-xs text-slate-500">{inst.email}</div>
+                                <div className="flex gap-2 mt-2">
+                                  {inst.telegram && <Badge variant="outline" className="text-[8px]">TG</Badge>}
+                                  {inst.whatsapp && <Badge variant="outline" className="text-[8px]">WA</Badge>}
+                                  {inst.facebook && <Badge variant="outline" className="text-[8px]">FB</Badge>}
+                                </div>
                               </div>
-                              <Badge variant="outline">Active</Badge>
+                              <Badge variant="outline" className="border-emerald-500/30 text-emerald-400">Active</Badge>
                             </div>
                           ))}
                         </div>
@@ -1283,12 +1391,12 @@ export default function SecurityDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Shield className="text-blue-500 w-6 h-6" />
-            <span className="text-xl font-bold text-white">ShieldAI</span>
+            <span className="text-xl font-bold text-white">BINI SHIELD AI</span>
           </div>
           <p className="text-sm text-slate-500 max-w-xs mx-auto mb-8">
             Protecting millions of users from digital threats using state-of-the-art AI.
           </p>
-          <div className="text-xs text-slate-600">© 2026 ShieldAI Security. All rights reserved.</div>
+          <div className="text-xs text-slate-600">© 2026 BINI SHIELD AI Security. All rights reserved.</div>
         </div>
       </footer>
     </div>

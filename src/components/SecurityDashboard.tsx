@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Shield, 
   ShieldAlert, 
@@ -24,7 +24,23 @@ import {
   ToggleRight,
   Facebook,
   Send,
-  Smartphone
+  Smartphone,
+  Languages,
+  Printer,
+  Trash2,
+  Plus,
+  Eye,
+  Wallet,
+  Users,
+  TrendingUp,
+  Code,
+  FileCode,
+  Upload,
+  Activity,
+  Check,
+  X,
+  FileText,
+  Mail
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -53,12 +69,11 @@ import {
   Area
 } from 'recharts';
 import { analyzeContent } from '@/lib/gemini';
-import { AnalysisResult, SecurityLog, DailyStats, ConnectionStatus } from '@/types';
+import { AnalysisResult, SecurityLog, DailyStats, ConnectionStatus, UserProfile, AuditResult, SocialAccount, AdminStats } from '@/types';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import { auth, db } from '@/lib/firebase';
 import AuthSystem from './AuthSystem';
-import { UserProfile } from '@/types';
 import { 
   signInWithPopup, 
   GoogleAuthProvider, 
@@ -77,15 +92,9 @@ import {
   Timestamp,
   doc,
   getDoc,
-  updateDoc
+  updateDoc,
+  getDocs
 } from 'firebase/firestore';
-
-const INITIAL_CONNECTIONS: ConnectionStatus[] = [
-  { id: 'tg', name: 'Telegram Bot', platform: 'telegram', isConnected: true, lastSync: new Date().toISOString(), autoScan: true },
-  { id: 'fb', name: 'Facebook Messenger', platform: 'facebook', isConnected: false, lastSync: null, autoScan: false },
-  { id: 'wa', name: 'WhatsApp Web', platform: 'whatsapp', isConnected: true, lastSync: new Date().toISOString(), autoScan: true },
-  { id: 'sys', name: 'System Monitor', platform: 'system', isConnected: true, lastSync: new Date().toISOString(), autoScan: true },
-];
 
 const SIMULATED_THREATS = [
   "Your account will be suspended. Click here to verify: http://bit.ly/secure-auth-99",
@@ -105,58 +114,144 @@ const MOCK_STATS: DailyStats[] = [
   { date: 'Apr 12', scanned: 24, threats: 4 },
 ];
 
-const MOCK_LOGS: SecurityLog[] = [
-  {
-    id: '1',
-    timestamp: new Date().toISOString(),
-    content: 'https://secure-login-bank.com/verify',
-    source: 'whatsapp',
-    result: {
-      isSafe: false,
-      score: 12,
-      threatType: 'phishing',
-      reason: 'Domain impersonates a financial institution and uses an insecure connection.',
-      recommendation: 'Do not visit this site. Report it to your bank.',
-      details: {
-        urgency: 'high',
-        socialEngineeringTechniques: ['Impersonation', 'Urgency'],
-        suspiciousElements: ['Look-alike domain', 'No SSL certificate']
-      }
-    }
+// Translations
+const translations = {
+  en: {
+    dashboard: "Dashboard",
+    scanner: "AI Scanner",
+    reports: "Reports",
+    connections: "Connections",
+    audit: "Security Audit",
+    admin: "Admin Panel",
+    upgrade: "Upgrade to Pro",
+    logout: "Logout",
+    login: "Login",
+    systemHealth: "System Health",
+    totalScanned: "Total Scanned",
+    threatsBlocked: "Threats Blocked",
+    activeMonitoring: "Active Monitoring",
+    scanning: "Scanning...",
+    analyze: "Analyze Content",
+    placeholder: "Paste URL or message to analyze...",
+    recentLogs: "Recent Security Logs",
+    noLogs: "No security logs found.",
+    safe: "Safe",
+    unsafe: "Unsafe",
+    revenue: "Total Revenue",
+    withdraw: "Withdraw Funds",
+    users: "Total Users",
+    print: "Print Report",
+    download: "Download PDF",
+    auditTitle: "System Security Audit",
+    auditDesc: "Upload code or enter URL for a deep security verification.",
+    socialTitle: "Social Account Protection",
+    socialDesc: "Connect your accounts to enable automatic hack protection.",
+    addAccount: "Add Account Link",
+    monitoring: "Monitoring",
+    protected: "Protected",
+    alert: "Threat Detected",
+    howItWorks: "How it works?",
+    privacyGuaranteed: "Privacy Guaranteed",
+    encrypted: "End-to-End Encrypted",
+    auditTarget: "Audit Target (URL or Code Folder)",
+    startAudit: "Start Security Audit",
+    auditSummary: "Audit Summary",
+    findings: "Security Findings",
+    certificate: "Security Certificate",
+    pass: "PASS",
+    fail: "FAIL",
+    warning: "WARNING"
   },
-  {
-    id: '2',
-    timestamp: new Date(Date.now() - 3600000).toISOString(),
-    content: 'Check out this cool video! http://bit.ly/xyz123',
-    source: 'telegram',
-    result: {
-      isSafe: false,
-      score: 45,
-      threatType: 'suspicious',
-      reason: 'Shortened URL with no clear destination. Often used to hide malicious sites.',
-      recommendation: 'Be careful. Use a URL expander before clicking.',
-      details: {
-        urgency: 'medium',
-        socialEngineeringTechniques: ['Curiosity'],
-        suspiciousElements: ['URL Shortener']
-      }
-    }
+  am: {
+    dashboard: "ዳሽቦርድ",
+    scanner: "AI ስካነር",
+    reports: "ሪፖርቶች",
+    connections: "ትስስሮች",
+    audit: "የደህንነት ምርመራ",
+    admin: "የአድሚን ገጽ",
+    upgrade: "ወደ ፕሮ ያሳድጉ",
+    logout: "ውጣ",
+    login: "ይግቡ",
+    systemHealth: "የሲስተም ጤንነት",
+    totalScanned: "ጠቅላላ የተመረመረ",
+    threatsBlocked: "የተከለከሉ ጥቃቶች",
+    activeMonitoring: "ንቁ ክትትል",
+    scanning: "በመመርመር ላይ...",
+    analyze: "ይመርምሩ",
+    placeholder: "ሊንክ ወይም መልዕክት እዚህ ይለጥፉ...",
+    recentLogs: "የቅርብ ጊዜ የደህንነት መዝገቦች",
+    noLogs: "ምንም የደህንነት መዝገብ አልተገኘም።",
+    safe: "ደህንነቱ የተጠበቀ",
+    unsafe: "አደገኛ",
+    revenue: "ጠቅላላ ገቢ",
+    withdraw: "ገንዘብ አውጣ",
+    users: "ጠቅላላ ተጠቃሚዎች",
+    print: "ሪፖርት አትም",
+    download: "አውርድ",
+    auditTitle: "የሲስተም ደህንነት ማረጋገጫ",
+    auditDesc: "የኮድ ፋይል ወይም ሊንክ በማስገባት ጥልቅ የደህንነት ምርመራ ያድርጉ።",
+    socialTitle: "የማህበራዊ ሚዲያ ጥበቃ",
+    socialDesc: "አካውንቶችዎን በማገናኘት አውቶማቲክ የሀክ ጥበቃ ያግኙ።",
+    addAccount: "የአካውንት ሊንክ ጨምር",
+    monitoring: "በክትትል ላይ",
+    protected: "የተጠበቀ",
+    alert: "ጥቃት ተገኝቷል",
+    howItWorks: "እንዴት ነው የሚሰራው?",
+    privacyGuaranteed: "ግላዊነት የተጠበቀ",
+    encrypted: "ሙሉ በሙሉ የተመሰጠረ",
+    auditTarget: "የምርመራ ኢላማ (URL ወይም የኮድ ፎልደር)",
+    startAudit: "የደህንነት ምርመራ ጀምር",
+    auditSummary: "የምርመራ ማጠቃለያ",
+    findings: "የደህንነት ግኝቶች",
+    certificate: "የደህንነት ማረጋገጫ",
+    pass: "አልፏል",
+    fail: "አልወደቀም",
+    warning: "ማስጠንቀቂያ"
   }
-];
+};
 
 export default function SecurityDashboard() {
+  const [lang, setLang] = useState<'en' | 'am'>('en');
+  const t = translations[lang];
+
   const [input, setInput] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [logs, setLogs] = useState<SecurityLog[]>([]);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isPro, setIsPro] = useState(false);
-  const [connections, setConnections] = useState<ConnectionStatus[]>(INITIAL_CONNECTIONS);
+  const [connections, setConnections] = useState<ConnectionStatus[]>([]);
   const [isAutoScanning, setIsAutoScanning] = useState(true);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isPaying, setIsPaying] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'telebirr' | 'cbe' | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Admin States
+  const [adminStats, setAdminStats] = useState<AdminStats>({
+    totalUsers: 0,
+    totalRevenue: 0,
+    activeAudits: 0,
+    blockedAttacks: 0
+  });
+
+  // Audit States
+  const [auditTarget, setAuditTarget] = useState('');
+  const [auditType, setAuditType] = useState<'url' | 'code'>('url');
+  const [isAuditing, setIsAuditing] = useState(false);
+  const [auditResults, setAuditResults] = useState<AuditResult[]>([]);
+  const [currentAudit, setCurrentAudit] = useState<any>(null);
+
+  // Social Monitoring States
+  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
+  const [newSocialLink, setNewSocialLink] = useState('');
+  const [newSocialPlatform, setNewSocialPlatform] = useState<SocialAccount['platform']>('telegram');
+
+  // Mounted check
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Auth Listener
   useEffect(() => {
@@ -168,7 +263,12 @@ export default function SecurityDashboard() {
         if (docSnap.exists()) {
           const profile = docSnap.data() as UserProfile;
           setUserProfile(profile);
-          setIsPro(profile.isPro);
+          setIsPro(profile.isPro || profile.role === 'admin');
+        }
+        
+        // Load Admin Stats if admin
+        if ((currentUser as any).role === 'admin' || currentUser.email === 'policeregion551@gmail.com') {
+          loadAdminStats();
         }
       } else {
         setUserProfile(null);
@@ -178,6 +278,61 @@ export default function SecurityDashboard() {
     });
     return () => unsubscribe();
   }, []);
+
+  const loadAdminStats = async () => {
+    // In real app, fetch from Firestore
+    setAdminStats({
+      totalUsers: 1240,
+      totalRevenue: 45200,
+      activeAudits: 15,
+      blockedAttacks: 842
+    });
+  };
+
+  const handleAudit = async () => {
+    if (!auditTarget) return;
+    setIsAuditing(true);
+    try {
+      const response = await fetch('/api/audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: auditTarget, type: auditType })
+      });
+      const data = await response.json();
+      const newAudit: AuditResult = {
+        id: Math.random().toString(36).substr(2, 9),
+        timestamp: new Date().toISOString(),
+        target: auditTarget,
+        type: auditType,
+        ...data
+      };
+      setAuditResults(prev => [newAudit, ...prev]);
+      setCurrentAudit(newAudit);
+      toast.success("Security Audit Completed!");
+    } catch (error) {
+      toast.error("Audit failed");
+    } finally {
+      setIsAuditing(false);
+    }
+  };
+
+  const addSocialAccount = () => {
+    if (!newSocialLink) return;
+    const newAcc: SocialAccount = {
+      id: Math.random().toString(36).substr(2, 9),
+      platform: newSocialPlatform,
+      link: newSocialLink,
+      status: 'monitoring',
+      attackCount: 0
+    };
+    setSocialAccounts(prev => [...prev, newAcc]);
+    setNewSocialLink('');
+    toast.success(`${newSocialPlatform} account added for monitoring`);
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   // Firestore Real-time Logs
   useEffect(() => {
@@ -334,6 +489,8 @@ export default function SecurityDashboard() {
   const threatsBlocked = logs.filter(l => !l.result.isSafe).length + 42;
   const safetyScore = 94;
 
+  if (!isMounted) return null;
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-slate-100 font-sans selection:bg-blue-500/30">
       <Toaster position="top-right" theme="dark" />
@@ -361,40 +518,44 @@ export default function SecurityDashboard() {
                 onClick={() => setActiveTab('dashboard')}
                 className={`text-sm font-medium transition-colors ${activeTab === 'dashboard' ? 'text-blue-400' : 'text-slate-400 hover:text-white'}`}
               >
-                Dashboard
+                {t.dashboard}
               </button>
               <button 
                 onClick={() => setActiveTab('analysis')}
                 className={`text-sm font-medium transition-colors ${activeTab === 'analysis' ? 'text-blue-400' : 'text-slate-400 hover:text-white'}`}
               >
-                AI Scanner
+                {t.scanner}
               </button>
               <button 
-                onClick={() => setActiveTab('reports')}
-                className={`text-sm font-medium transition-colors ${activeTab === 'reports' ? 'text-blue-400' : 'text-slate-400 hover:text-white'}`}
+                onClick={() => setActiveTab('audit')}
+                className={`text-sm font-medium transition-colors ${activeTab === 'audit' ? 'text-blue-400' : 'text-slate-400 hover:text-white'}`}
               >
-                Reports
+                {t.audit}
               </button>
               <button 
                 onClick={() => setActiveTab('connections')}
                 className={`text-sm font-medium transition-colors ${activeTab === 'connections' ? 'text-blue-400' : 'text-slate-400 hover:text-white'}`}
               >
-                Connections
+                {t.connections}
               </button>
-              {!isPro && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10 gap-2"
-                  onClick={() => setActiveTab('pricing')}
+              {user?.role === 'admin' && (
+                <button 
+                  onClick={() => setActiveTab('admin')}
+                  className={`text-sm font-medium transition-colors ${activeTab === 'admin' ? 'text-amber-400' : 'text-slate-400 hover:text-white'}`}
                 >
-                  <Zap className="w-3.5 h-3.5 fill-blue-400" />
-                  Upgrade to Pro
-                </Button>
+                  {t.admin}
+                </button>
               )}
             </div>
 
             <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setLang(lang === 'en' ? 'am' : 'en')}
+                className="p-2 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-colors flex items-center gap-2 text-xs font-bold"
+              >
+                <Languages className="w-4 h-4" />
+                {lang === 'en' ? 'አማርኛ' : 'English'}
+              </button>
               {user ? (
                 <div className="flex items-center gap-3">
                   <div className="text-right hidden sm:block">
@@ -464,16 +625,16 @@ export default function SecurityDashboard() {
               <Card className="bg-slate-900/50 border-white/5 backdrop-blur-sm overflow-hidden relative group">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <CardHeader className="pb-2">
-                  <CardDescription className="text-slate-400 uppercase text-[10px] font-bold tracking-widest">System Health</CardDescription>
+                  <CardDescription className="text-slate-400 uppercase text-[10px] font-bold tracking-widest">{t.systemHealth}</CardDescription>
                   <CardTitle className="text-3xl font-bold text-white flex items-baseline gap-2">
-                    {safetyScore}% <span className="text-sm font-normal text-emerald-400">Secure</span>
+                    98% <span className="text-sm font-normal text-emerald-400">Secure</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
                     <motion.div 
                       initial={{ width: 0 }}
-                      animate={{ width: `${safetyScore}%` }}
+                      animate={{ width: `98%` }}
                       className="h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"
                     />
                   </div>
@@ -482,8 +643,8 @@ export default function SecurityDashboard() {
 
               <Card className="bg-slate-900/50 border-white/5 backdrop-blur-sm">
                 <CardHeader className="pb-2">
-                  <CardDescription className="text-slate-400 uppercase text-[10px] font-bold tracking-widest">Total Scanned</CardDescription>
-                  <CardTitle className="text-3xl font-bold text-white">{totalScanned}</CardTitle>
+                  <CardDescription className="text-slate-400 uppercase text-[10px] font-bold tracking-widest">{t.totalScanned}</CardDescription>
+                  <CardTitle className="text-3xl font-bold text-white">1,284</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-xs text-slate-500 flex items-center gap-1">
@@ -495,8 +656,8 @@ export default function SecurityDashboard() {
 
               <Card className="bg-slate-900/50 border-white/5 backdrop-blur-sm">
                 <CardHeader className="pb-2">
-                  <CardDescription className="text-slate-400 uppercase text-[10px] font-bold tracking-widest">Threats Blocked</CardDescription>
-                  <CardTitle className="text-3xl font-bold text-red-400">{threatsBlocked}</CardTitle>
+                  <CardDescription className="text-slate-400 uppercase text-[10px] font-bold tracking-widest">{t.threatsBlocked}</CardDescription>
+                  <CardTitle className="text-3xl font-bold text-red-400">42</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-xs text-slate-500 flex items-center gap-1">
@@ -512,16 +673,16 @@ export default function SecurityDashboard() {
               <CardHeader>
                 <CardTitle className="text-lg font-semibold flex items-center gap-2">
                   <Zap className="w-5 h-5 text-blue-400 fill-blue-400" />
-                  Instant AI Scanner
+                  {t.scanner}
                 </CardTitle>
-                <CardDescription>Paste any link or message from Telegram, Facebook, or WhatsApp to verify its safety.</CardDescription>
+                <CardDescription>{t.placeholder}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex gap-4">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <Input 
-                      placeholder="Paste URL or message here..." 
+                      placeholder={t.placeholder} 
                       className="bg-black/50 border-white/10 pl-10 h-12 text-white focus-visible:ring-blue-500"
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
@@ -533,7 +694,7 @@ export default function SecurityDashboard() {
                     onClick={handleAnalyze}
                     disabled={isAnalyzing || !input.trim()}
                   >
-                    {isAnalyzing ? "Analyzing..." : "Scan Now"}
+                    {isAnalyzing ? t.scanning : t.analyze}
                   </Button>
                 </div>
               </CardContent>
@@ -544,7 +705,7 @@ export default function SecurityDashboard() {
               <Card className="bg-slate-900/50 border-white/5 overflow-hidden">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
-                    <CardTitle className="text-lg font-semibold">Security Logs</CardTitle>
+                    <CardTitle className="text-lg font-semibold">{t.recentLogs}</CardTitle>
                     <CardDescription>Real-time monitoring results</CardDescription>
                   </div>
                   <History className="w-5 h-5 text-slate-500" />
@@ -552,41 +713,47 @@ export default function SecurityDashboard() {
                 <CardContent className="p-0">
                   <ScrollArea className="h-[400px]">
                     <div className="divide-y divide-white/5">
-                      {logs.map((log) => (
-                        <div key={log.id} className="p-4 hover:bg-white/5 transition-colors group">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex items-start gap-3">
-                              <div className={`mt-1 w-8 h-8 rounded-lg flex items-center justify-center ${
-                                log.result.isSafe ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'
-                              }`}>
-                                {log.result.isSafe ? <ShieldCheck className="w-5 h-5" /> : <ShieldAlert className="w-5 h-5" />}
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                  <Badge variant="outline" className="text-[10px] uppercase tracking-tighter border-white/10 bg-black/20">
-                                    {log.source}
-                                  </Badge>
-                                  <span className="text-[10px] text-slate-500 font-mono">
-                                    {new Date(log.timestamp).toLocaleTimeString()}
-                                  </span>
+                      {logs.length === 0 ? (
+                        <div className="text-center py-12">
+                          <p className="text-slate-500">{t.noLogs}</p>
+                        </div>
+                      ) : (
+                        logs.map((log) => (
+                          <div key={log.id} className="p-4 hover:bg-white/5 transition-colors group">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex items-start gap-3">
+                                <div className={`mt-1 w-8 h-8 rounded-lg flex items-center justify-center ${
+                                  log.result.isSafe ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'
+                                }`}>
+                                  {log.result.isSafe ? <ShieldCheck className="w-5 h-5" /> : <ShieldAlert className="w-5 h-5" />}
                                 </div>
-                                <p className="text-sm font-medium text-slate-200 line-clamp-1 mb-1">{log.content}</p>
-                                <p className="text-xs text-slate-400 line-clamp-2">{log.result.reason}</p>
+                                <div>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <Badge variant="outline" className="text-[10px] uppercase tracking-tighter border-white/10 bg-black/20">
+                                      {log.source}
+                                    </Badge>
+                                    <span className="text-[10px] text-slate-500 font-mono">
+                                      {new Date(log.timestamp).toLocaleTimeString()}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm font-medium text-slate-200 line-clamp-1 mb-1">{log.content}</p>
+                                  <p className="text-xs text-slate-400 line-clamp-2">{log.result.reason}</p>
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-2">
-                              <div className={`text-xs font-bold ${
-                                log.result.score > 80 ? 'text-emerald-400' : log.result.score > 40 ? 'text-amber-400' : 'text-red-400'
-                              }`}>
-                                {log.result.score}% Safe
+                              <div className="flex flex-col items-end gap-2">
+                                <div className={`text-xs font-bold ${
+                                  log.result.score > 80 ? 'text-emerald-400' : log.result.score > 40 ? 'text-amber-400' : 'text-red-400'
+                                }`}>
+                                  {log.result.score}% {log.result.isSafe ? t.safe : t.unsafe}
+                                </div>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <ExternalLink className="w-4 h-4" />
+                                </Button>
                               </div>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <ExternalLink className="w-4 h-4" />
-                              </Button>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
                   </ScrollArea>
                 </CardContent>
@@ -658,8 +825,8 @@ export default function SecurityDashboard() {
             className="max-w-3xl mx-auto space-y-8"
           >
             <div className="text-center space-y-4">
-              <h2 className="text-4xl font-bold text-white tracking-tight">የላቀ የኤአይ መርማሪ (Advanced AI Scanner)</h2>
-              <p className="text-slate-400">የእኛ የኤአይ ሲስተም ሊንኮችን እና መልዕክቶችን በመመርመር ከሀኪንግ እና ከቫይረስ ይጠብቅዎታል።</p>
+              <h2 className="text-4xl font-bold text-white tracking-tight">{t.scanner}</h2>
+              <p className="text-slate-400">{t.placeholder}</p>
             </div>
 
             <Card className="bg-slate-900/50 border-white/5 p-8">
@@ -704,9 +871,9 @@ export default function SecurityDashboard() {
                       >
                         <Shield className="w-5 h-5" />
                       </motion.div>
-                      Analyzing Threats...
+                      {t.scanning}
                     </div>
-                  ) : "Run Deep Scan"}
+                  ) : t.analyze}
                 </Button>
               </div>
             </Card>
@@ -829,6 +996,200 @@ export default function SecurityDashboard() {
           </motion.div>
         )}
 
+        {user?.role === 'admin' && activeTab === 'admin' && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="space-y-8"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <Card className="bg-slate-900/50 border-amber-500/20">
+                <CardHeader className="pb-2">
+                  <CardDescription className="text-slate-400 uppercase text-[10px] font-bold">{t.revenue}</CardDescription>
+                  <CardTitle className="text-2xl font-bold text-amber-400">{adminStats.totalRevenue} ETB</CardTitle>
+                </CardHeader>
+                <CardFooter>
+                  <Button size="sm" className="w-full bg-amber-600 hover:bg-amber-700 gap-2">
+                    <Wallet className="w-4 h-4" />
+                    {t.withdraw}
+                  </Button>
+                </CardFooter>
+              </Card>
+              <Card className="bg-slate-900/50 border-white/5">
+                <CardHeader className="pb-2">
+                  <CardDescription className="text-slate-400 uppercase text-[10px] font-bold">{t.users}</CardDescription>
+                  <CardTitle className="text-2xl font-bold text-white">{adminStats.totalUsers}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card className="bg-slate-900/50 border-white/5">
+                <CardHeader className="pb-2">
+                  <CardDescription className="text-slate-400 uppercase text-[10px] font-bold">Active Audits</CardDescription>
+                  <CardTitle className="text-2xl font-bold text-white">{adminStats.activeAudits}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card className="bg-slate-900/50 border-white/5">
+                <CardHeader className="pb-2">
+                  <CardDescription className="text-slate-400 uppercase text-[10px] font-bold">Blocked Attacks</CardDescription>
+                  <CardTitle className="text-2xl font-bold text-emerald-400">{adminStats.blockedAttacks}</CardTitle>
+                </CardHeader>
+              </Card>
+            </div>
+
+            <Card className="bg-slate-900/50 border-white/5">
+              <CardHeader>
+                <CardTitle>System Activity Monitoring</CardTitle>
+                <CardDescription>Real-time overview of all scans and threats across the platform.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={MOCK_STATS}>
+                      <defs>
+                        <linearGradient id="colorScanned" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                      <XAxis dataKey="date" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
+                        itemStyle={{ color: '#fff' }}
+                      />
+                      <Area type="monotone" dataKey="scanned" stroke="#3b82f6" fillOpacity={1} fill="url(#colorScanned)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {activeTab === 'audit' && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-8"
+          >
+            <div className="text-center space-y-4 mb-12">
+              <h2 className="text-4xl font-bold text-white tracking-tight">{t.auditTitle}</h2>
+              <p className="text-slate-400">{t.auditDesc}</p>
+            </div>
+
+            <Card className="bg-slate-900/50 border-white/5 p-6">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1 space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase">{t.auditTarget}</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
+                    <Input 
+                      placeholder="https://example.com or project-folder/"
+                      className="pl-10 bg-black/40 border-white/10 text-white h-12"
+                      value={auditTarget}
+                      onChange={(e) => setAuditTarget(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="w-full md:w-48 space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Type</label>
+                  <select 
+                    className="w-full h-12 bg-black/40 border-white/10 text-white rounded-md px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    value={auditType}
+                    onChange={(e: any) => setAuditType(e.target.value)}
+                  >
+                    <option value="url">Website URL</option>
+                    <option value="code">Source Code</option>
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <Button 
+                    className="h-12 bg-blue-600 hover:bg-blue-700 px-8 gap-2"
+                    onClick={handleAudit}
+                    disabled={isAuditing}
+                  >
+                    {isAuditing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                    {t.startAudit}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            {currentAudit && (
+              <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}>
+                <Card className="bg-slate-900/50 border-blue-500/30 overflow-hidden print:bg-white print:text-black print:border-none">
+                  <CardHeader className="bg-blue-600/10 border-b border-white/5 flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-2xl flex items-center gap-3">
+                        {t.auditSummary}
+                        <Badge className={currentAudit.status === 'pass' ? 'bg-emerald-500' : currentAudit.status === 'fail' ? 'bg-red-500' : 'bg-amber-500'}>
+                          {t[currentAudit.status as keyof typeof t]}
+                        </Badge>
+                      </CardTitle>
+                      <CardDescription>{currentAudit.target} - {new Date(currentAudit.timestamp).toLocaleString()}</CardDescription>
+                    </div>
+                    <div className="flex gap-2 print:hidden">
+                      <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
+                        <Printer className="w-4 h-4" />
+                        {t.print}
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-8 space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                      <div className="text-center p-6 rounded-2xl bg-black/20 border border-white/5">
+                        <div className="text-4xl font-black text-blue-400 mb-2">{currentAudit.score}%</div>
+                        <div className="text-xs uppercase font-bold text-slate-500">Security Score</div>
+                      </div>
+                      <div className="col-span-2 space-y-4">
+                        <h4 className="font-bold text-white flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-amber-500" />
+                          {t.findings}
+                        </h4>
+                        <div className="space-y-3">
+                          {currentAudit.findings.map((f: any, i: number) => (
+                            <div key={i} className="p-4 rounded-lg bg-white/5 border-l-4 border-amber-500">
+                              <div className="flex justify-between items-start mb-1">
+                                <span className="text-sm font-bold text-white">{f.issue}</span>
+                                <Badge variant="outline" className="text-[10px] uppercase">{f.severity}</Badge>
+                              </div>
+                              <p className="text-xs text-slate-400">Fix: {f.fix}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-12 border-4 border-double border-blue-500/20 rounded-3xl text-center space-y-6 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <Shield className="w-40 h-40" />
+                      </div>
+                      <h3 className="text-3xl font-serif italic text-white">{t.certificate}</h3>
+                      <div className="max-w-md mx-auto space-y-4">
+                        <p className="text-slate-400">This document certifies that the system at <strong>{currentAudit.target}</strong> has undergone a rigorous AI-driven security audit.</p>
+                        <div className="flex justify-center gap-8 py-4">
+                          <div className="text-center">
+                            <div className="font-mono text-xs text-slate-500">Certificate ID</div>
+                            <div className="font-bold text-white">{currentAudit.id}</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="font-mono text-xs text-slate-500">Verification Date</div>
+                            <div className="font-bold text-white">{new Date(currentAudit.timestamp).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                        <div className="pt-8 flex flex-col items-center">
+                          <div className="w-32 h-1 bg-blue-500 mb-2" />
+                          <div className="text-xs font-bold text-slate-500 uppercase tracking-widest">ShieldAI Security Authority</div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+
         {activeTab === 'connections' && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -836,102 +1197,94 @@ export default function SecurityDashboard() {
             className="space-y-8"
           >
             <div className="text-center space-y-4 mb-12">
-              <h2 className="text-4xl font-bold text-white tracking-tight">የመተግበሪያ ትስስር (App Connections)</h2>
-              <p className="text-slate-400">ShieldAIን ከማህበራዊ ሚዲያ መተግበሪያዎችዎ ጋር በማገናኘት አውቶማቲክ ጥበቃ ያግኙ።</p>
+              <h2 className="text-4xl font-bold text-white tracking-tight">{t.socialTitle}</h2>
+              <p className="text-slate-400">{t.socialDesc}</p>
             </div>
 
+            <Card className="bg-slate-900/50 border-white/5 p-6">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1 space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase">{t.addAccount}</label>
+                  <div className="relative">
+                    <Link2 className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
+                    <Input 
+                      placeholder="https://t.me/username or profile link"
+                      className="pl-10 bg-black/40 border-white/10 text-white h-12"
+                      value={newSocialLink}
+                      onChange={(e) => setNewSocialLink(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="w-full md:w-48 space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Platform</label>
+                  <select 
+                    className="w-full h-12 bg-black/40 border-white/10 text-white rounded-md px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    value={newSocialPlatform}
+                    onChange={(e: any) => setNewSocialPlatform(e.target.value)}
+                  >
+                    <option value="telegram">Telegram</option>
+                    <option value="facebook">Facebook</option>
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="email">Email Account</option>
+                    <option value="instagram">Instagram</option>
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <Button 
+                    className="h-12 bg-blue-600 hover:bg-blue-700 px-8 gap-2"
+                    onClick={addSocialAccount}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Connect
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {connections.map((conn) => (
-                <Card key={conn.id} className="bg-slate-900/50 border-white/5 backdrop-blur-sm overflow-hidden">
+              {socialAccounts.map((acc) => (
+                <Card key={acc.id} className="bg-slate-900/50 border-white/5 overflow-hidden group">
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                        conn.platform === 'telegram' ? 'bg-sky-500/10 text-sky-500' :
-                        conn.platform === 'facebook' ? 'bg-blue-600/10 text-blue-600' :
-                        conn.platform === 'whatsapp' ? 'bg-emerald-500/10 text-emerald-500' :
-                        'bg-slate-500/10 text-slate-500'
-                      }`}>
-                        {conn.platform === 'telegram' && <Send className="w-6 h-6" />}
-                        {conn.platform === 'facebook' && <Facebook className="w-6 h-6" />}
-                        {conn.platform === 'whatsapp' && <MessageSquare className="w-6 h-6" />}
-                        {conn.platform === 'system' && <Smartphone className="w-6 h-6" />}
+                      <div className="w-10 h-10 rounded-lg bg-blue-600/10 flex items-center justify-center text-blue-400">
+                        {acc.platform === 'telegram' && <Send className="w-5 h-5" />}
+                        {acc.platform === 'facebook' && <Facebook className="w-5 h-5" />}
+                        {acc.platform === 'whatsapp' && <MessageSquare className="w-5 h-5" />}
+                        {acc.platform === 'email' && <Mail className="w-5 h-5" />}
+                        {acc.platform === 'instagram' && <Smartphone className="w-5 h-5" />}
                       </div>
                       <div>
-                        <CardTitle className="text-lg">{conn.name}</CardTitle>
-                        <CardDescription className="text-xs">
-                          {conn.isConnected ? `Last synced: ${new Date(conn.lastSync!).toLocaleTimeString()}` : 'Not connected'}
-                        </CardDescription>
+                        <CardTitle className="text-base">{acc.link}</CardTitle>
+                        <CardDescription className="text-[10px] uppercase font-bold tracking-widest">{acc.platform}</CardDescription>
                       </div>
                     </div>
-                    <Badge variant={conn.isConnected ? "default" : "outline"} className={conn.isConnected ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/20" : "text-slate-500"}>
-                      {conn.isConnected ? 'Connected' : 'Disconnected'}
+                    <Badge className={acc.status === 'protected' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}>
+                      {t[acc.status as keyof typeof t]}
                     </Badge>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-white/5">
-                      <div className="space-y-0.5">
-                        <div className="text-sm font-medium text-white">Auto-Scan Messages</div>
-                        <div className="text-[10px] text-slate-500">Automatically analyze incoming links and texts.</div>
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-3 h-3 text-emerald-500" />
+                        Live Protection Active
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => {
-                          setConnections(prev => prev.map(c => c.id === conn.id ? { ...c, autoScan: !c.autoScan } : c));
-                          toast.success(`${conn.name} Auto-Scan ${!conn.autoScan ? 'Enabled' : 'Disabled'}`);
-                        }}
-                      >
-                        {conn.autoScan ? <ToggleRight className="w-8 h-8 text-blue-500" /> : <ToggleLeft className="w-8 h-8 text-slate-600" />}
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <ShieldAlert className="w-3 h-3 text-red-400" />
+                        {acc.attackCount} Attacks Blocked
+                      </div>
                     </div>
                   </CardContent>
-                  <CardFooter className="bg-white/5 p-3">
-                    <Button 
-                      variant="ghost" 
-                      className="w-full text-xs gap-2 text-slate-400 hover:text-white"
-                      onClick={() => {
-                        if (!conn.isConnected) {
-                          toast.info(`Connecting to ${conn.name}...`);
-                          setTimeout(() => {
-                            setConnections(prev => prev.map(c => c.id === conn.id ? { ...c, isConnected: true, lastSync: new Date().toISOString() } : c));
-                            toast.success(`Successfully connected to ${conn.name}`);
-                          }, 1500);
-                        } else {
-                          setConnections(prev => prev.map(c => c.id === conn.id ? { ...c, isConnected: false } : c));
-                          toast.info(`Disconnected from ${conn.name}`);
-                        }
-                      }}
-                    >
-                      {conn.isConnected ? <RefreshCw className="w-3 h-3" /> : <Link2 className="w-3 h-3" />}
-                      {conn.isConnected ? 'Sync Now' : 'Connect Account'}
+                  <CardFooter className="bg-white/5 p-2 flex gap-2">
+                    <Button variant="ghost" size="sm" className="flex-1 text-[10px] uppercase font-bold text-slate-400 hover:text-white">
+                      View Logs
+                    </Button>
+                    <Button variant="ghost" size="sm" className="flex-1 text-[10px] uppercase font-bold text-red-400 hover:bg-red-500/10">
+                      Disconnect
                     </Button>
                   </CardFooter>
                 </Card>
               ))}
             </div>
-
-            <Card className="bg-blue-600/10 border-blue-500/20 p-6">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
-                  <AlertCircle className="w-5 h-5 text-blue-400" />
-                </div>
-                <div className="space-y-2">
-                  <h4 className="text-lg font-bold text-white">How it works? (እንዴት ነው የሚሰራው?)</h4>
-                  <p className="text-sm text-slate-400 leading-relaxed">
-                    ShieldAI uses official APIs and accessibility services to monitor your incoming notifications. 
-                    When a message contains a link or suspicious text, our AI analyzes it in the background and alerts you instantly if a threat is found.
-                  </p>
-                  <div className="flex gap-4 pt-2">
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                      <Lock className="w-3 h-3" /> End-to-End Encrypted
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                      <ShieldCheck className="w-3 h-3" /> Privacy Guaranteed
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
           </motion.div>
         )}
 

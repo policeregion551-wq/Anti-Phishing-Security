@@ -3,8 +3,11 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
+import { GoogleGenAI, Type } from "@google/genai";
 
 dotenv.config();
+
+const genAI = process.env.GEMINI_API_KEY ? new (GoogleGenAI as any)(process.env.GEMINI_API_KEY) : null;
 
 async function startServer() {
   const app = express();
@@ -66,6 +69,108 @@ async function startServer() {
     } catch (error) {
       console.error("Failed to send email:", error);
       res.status(500).json({ error: "Failed to send verification email" });
+    }
+  });
+
+  // API Route to send Phone OTP
+  app.post("/api/send-phone-otp", async (req, res) => {
+    const { phone, code } = req.body;
+
+    if (!phone || !code) {
+      return res.status(400).json({ error: "Phone and code are required" });
+    }
+
+    // Mock SMS sending - In real app, use Twilio, Infobip, etc.
+    console.log(`[MOCK SMS] To: ${phone}, Code: ${code}`);
+    res.json({ 
+      success: true, 
+      message: "Phone OTP sent (Mocked). Check server console.",
+      isMock: true 
+    });
+  });
+
+  // API Route for Security Audit
+  app.post("/api/audit", async (req, res) => {
+    const { target, type } = req.body;
+
+    if (!target) {
+      return res.status(400).json({ error: "Target is required" });
+    }
+
+    if (!genAI) {
+      return res.status(500).json({ error: "Gemini AI is not configured" });
+    }
+
+    try {
+      const model = (genAI as any).getGenerativeModel({
+        model: "gemini-1.5-flash",
+        generationConfig: {
+          responseMimeType: "application/json",
+        },
+        systemInstruction: `You are a senior security auditor. Analyze the provided ${type} (URL or Code) for vulnerabilities. 
+          Return a JSON object with: 
+          - status: 'pass' | 'fail' | 'warning'
+          - score: number (0-100)
+          - findings: array of { severity: 'critical'|'high'|'medium'|'low', issue: string, fix: string }
+          - summary: string`
+      });
+
+      const result = await model.generateContent(`Audit this ${type}: "${target}"`);
+      const response = await result.response;
+      res.json(JSON.parse(response.text()));
+    } catch (error) {
+      console.error("Audit failed:", error);
+      res.status(500).json({ error: "Security audit failed" });
+    }
+  });
+
+  // API Route for Gemini Analysis
+  app.post("/api/analyze", async (req, res) => {
+    const { content } = req.body;
+
+    if (!content) {
+      return res.status(400).json({ error: "Content is required" });
+    }
+
+    if (!genAI) {
+      return res.status(500).json({ error: "Gemini AI is not configured on the server" });
+    }
+
+    try {
+      const model = (genAI as any).getGenerativeModel({
+        model: "gemini-1.5-flash",
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              isSafe: { type: Type.BOOLEAN },
+              score: { type: Type.NUMBER },
+              threatType: { type: Type.STRING },
+              reason: { type: Type.STRING },
+              recommendation: { type: Type.STRING },
+              details: {
+                type: Type.OBJECT,
+                properties: {
+                  urgency: { type: Type.STRING },
+                  socialEngineeringTechniques: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  suspiciousElements: { type: Type.ARRAY, items: { type: Type.STRING } }
+                },
+                required: ['urgency', 'socialEngineeringTechniques', 'suspiciousElements']
+              }
+            },
+            required: ['isSafe', 'score', 'threatType', 'reason', 'recommendation', 'details']
+          }
+        },
+        systemInstruction: "You are a cybersecurity expert. Analyze the content for phishing, malware, or scams. Return JSON."
+      });
+
+      const result = await model.generateContent(`Analyze this: "${content}"`);
+      const response = await result.response;
+      res.json(JSON.parse(response.text()));
+    } catch (error) {
+      console.error("Gemini analysis failed:", error);
+      res.status(500).json({ error: "AI Analysis failed" });
     }
   });
 

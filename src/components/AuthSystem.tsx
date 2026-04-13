@@ -27,10 +27,11 @@ export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: 
     phone: '',
     code: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    role: 'user' as 'user' | 'institution'
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
@@ -62,7 +63,7 @@ export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: 
         password: formData.password, // Storing password as requested by user
         isPro: formData.email === 'policeregion551@gmail.com',
         isPaid: formData.email === 'policeregion551@gmail.com',
-        role: formData.email === 'policeregion551@gmail.com' ? 'admin' : 'user',
+        role: formData.email === 'policeregion551@gmail.com' ? 'admin' : formData.role,
         createdAt: new Date().toISOString(),
         paymentStatus: formData.email === 'policeregion551@gmail.com' ? 'completed' : 'pending'
       };
@@ -115,13 +116,13 @@ export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: 
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 selection:bg-blue-500/30">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl shadow-[0_0_30px_rgba(37,99,235,0.3)] mb-4">
             <Shield className="text-white w-8 h-8" />
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">ShieldAI Security</h1>
+          <h1 className="text-3xl font-bold text-white tracking-tight">BINI SHIELD AI</h1>
           <p className="text-slate-500 mt-2">በም/ኢ/ር ቢኒያም ይርሳዉ መጢና የበለፀገ</p>
         </div>
 
@@ -133,10 +134,10 @@ export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: 
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
-              <Card className="bg-slate-900/50 border-white/5 backdrop-blur-xl">
+              <Card className="bg-slate-900/40 border-white/5 backdrop-blur-2xl shadow-2xl">
                 <CardHeader>
-                  <CardTitle className="text-xl text-white">አዲስ አካውንት ይፍጠሩ (Register)</CardTitle>
-                  <CardDescription>ለመጀመር መረጃዎን ያስገቡ</CardDescription>
+                  <CardTitle className="text-xl text-white font-semibold">አዲስ አካውንት ይፍጠሩ (Register)</CardTitle>
+                  <CardDescription className="text-slate-400">ለመጀመር መረጃዎን ያስገቡ</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleRegister} className="space-y-4">
@@ -179,6 +180,20 @@ export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: 
                     </div>
                     <div className="space-y-2">
                       <div className="relative">
+                        <Shield className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
+                        <select 
+                          name="role"
+                          className="w-full pl-10 h-10 bg-black/20 border-white/10 text-white rounded-md text-sm appearance-none"
+                          value={formData.role}
+                          onChange={handleChange}
+                        >
+                          <option value="user" className="bg-slate-900">የግል ተጠቃሚ (Personal User)</option>
+                          <option value="institution" className="bg-slate-900">ተቋም (Institution)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="relative">
                         <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
                         <Input 
                           name="password"
@@ -215,10 +230,10 @@ export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: 
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
-              <Card className="bg-slate-900/50 border-white/5 backdrop-blur-xl">
+              <Card className="bg-slate-900/40 border-white/5 backdrop-blur-2xl shadow-2xl">
                 <CardHeader>
-                  <CardTitle className="text-xl text-white">ይግቡ (Login)</CardTitle>
-                  <CardDescription>አካውንትዎን በመጠቀም ይግቡ</CardDescription>
+                  <CardTitle className="text-xl text-white font-semibold">ይግቡ (Login)</CardTitle>
+                  <CardDescription className="text-slate-400">አካውንትዎን በመጠቀም ይግቡ</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleLogin} className="space-y-4">

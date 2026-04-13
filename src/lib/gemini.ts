@@ -102,3 +102,48 @@ export async function performSecurityAudit(target: string, type: string) {
     throw error;
   }
 }
+
+export async function verifyReceipt(imageBase64: string) {
+  try {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [
+        {
+          inlineData: {
+            mimeType: "image/jpeg",
+            data: imageBase64
+          }
+        },
+        {
+          text: `Extract the following information from this Telebirr receipt image:
+          1. Transaction ID (usually starts with 'BINI' or a long alphanumeric string)
+          2. Amount Paid (in ETB)
+          3. Date of Transaction
+          4. Is it a valid Telebirr receipt? (true/false)
+          
+          Return the data in JSON format.`
+        }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            transactionId: { type: Type.STRING },
+            amount: { type: Type.NUMBER },
+            date: { type: Type.STRING },
+            isValid: { type: Type.BOOLEAN },
+            reason: { type: Type.STRING }
+          },
+          required: ['transactionId', 'amount', 'date', 'isValid']
+        }
+      }
+    });
+
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error("Receipt verification failed:", error);
+    throw error;
+  }
+}

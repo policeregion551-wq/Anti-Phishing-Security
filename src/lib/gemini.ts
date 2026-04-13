@@ -7,37 +7,23 @@ export async function analyzeContent(content: string): Promise<AnalysisResult> {
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Analyze the following message or URL for security threats (phishing, malware, scams, suspicious activity). 
-      Content to analyze: "${content}"`,
+      contents: `Analyze this content for phishing, malware, or scams: "${content}"`,
       config: {
-        systemInstruction: `You are a world-class cybersecurity expert specializing in phishing detection and social engineering analysis. 
-        Your task is to evaluate messages, links, and snippets for potential threats.
-        Be extremely cautious. If something looks even slightly like a scam (e.g., "urgent action required", "win a prize", "verify your account"), mark it as suspicious or phishing.
-        Return the analysis in a strict JSON format.`,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             isSafe: { type: Type.BOOLEAN },
-            score: { type: Type.NUMBER, description: "Safety score from 0 to 100" },
-            threatType: { 
-              type: Type.STRING, 
-              enum: ['none', 'phishing', 'malware', 'scam', 'suspicious'] 
-            },
+            score: { type: Type.NUMBER },
+            threatType: { type: Type.STRING },
             reason: { type: Type.STRING },
             recommendation: { type: Type.STRING },
             details: {
               type: Type.OBJECT,
               properties: {
-                urgency: { type: Type.STRING, enum: ['low', 'medium', 'high'] },
-                socialEngineeringTechniques: { 
-                  type: Type.ARRAY, 
-                  items: { type: Type.STRING } 
-                },
-                suspiciousElements: { 
-                  type: Type.ARRAY, 
-                  items: { type: Type.STRING } 
-                }
+                urgency: { type: Type.STRING },
+                socialEngineeringTechniques: { type: Type.ARRAY, items: { type: Type.STRING } },
+                suspiciousElements: { type: Type.ARRAY, items: { type: Type.STRING } }
               },
               required: ['urgency', 'socialEngineeringTechniques', 'suspiciousElements']
             }
@@ -47,8 +33,7 @@ export async function analyzeContent(content: string): Promise<AnalysisResult> {
       }
     });
 
-    const result = JSON.parse(response.text || "{}");
-    return result as AnalysisResult;
+    return JSON.parse(response.text) as AnalysisResult;
   } catch (error) {
     console.error("AI Analysis failed:", error);
     return {
@@ -63,5 +48,44 @@ export async function analyzeContent(content: string): Promise<AnalysisResult> {
         suspiciousElements: ['Technical error during analysis']
       }
     };
+  }
+}
+
+export async function performSecurityAudit(target: string, type: string) {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Perform a deep security audit for the following ${type}: ${target}. 
+      Identify potential vulnerabilities, security risks, and provide a security score (0-100).`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            status: { type: Type.STRING },
+            score: { type: Type.NUMBER },
+            findings: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  severity: { type: Type.STRING },
+                  issue: { type: Type.STRING },
+                  fix: { type: Type.STRING }
+                },
+                required: ['severity', 'issue', 'fix']
+              }
+            },
+            summary: { type: Type.STRING }
+          },
+          required: ['status', 'score', 'findings', 'summary']
+        }
+      }
+    });
+
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error("Audit failed:", error);
+    throw error;
   }
 }

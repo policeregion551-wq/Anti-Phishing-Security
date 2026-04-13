@@ -40,7 +40,9 @@ import {
   Check,
   X,
   FileText,
-  Mail
+  Mail,
+  Building2,
+  FileWarning
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -68,7 +70,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { analyzeContent } from '@/lib/gemini';
+import { analyzeContent, performSecurityAudit } from '@/lib/gemini';
 import { AnalysisResult, SecurityLog, DailyStats, ConnectionStatus, UserProfile, AuditResult, SocialAccount, AdminStats } from '@/types';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
@@ -160,7 +162,19 @@ const translations = {
     certificate: "Security Certificate",
     pass: "PASS",
     fail: "FAIL",
-    warning: "WARNING"
+    warning: "WARNING",
+    paymentRequired: "Payment Required",
+    paymentDesc: "You must pay to activate the security system and access reports.",
+    payNow: "Pay Now",
+    institutions: "Institutional Accounts",
+    addInstitution: "Add Institution",
+    attackReports: "Attack Reports",
+    blocked: "Blocked",
+    detected: "Detected",
+    telebirrWithdraw: "Telebirr Withdrawal",
+    withdrawAmount: "Withdrawal Amount",
+    withdrawPhone: "Telebirr Phone Number",
+    confirmWithdraw: "Confirm Withdrawal"
   },
   am: {
     dashboard: "ዳሽቦርድ",
@@ -206,7 +220,19 @@ const translations = {
     certificate: "የደህንነት ማረጋገጫ",
     pass: "አልፏል",
     fail: "አልወደቀም",
-    warning: "ማስጠንቀቂያ"
+    warning: "ማስጠንቀቂያ",
+    paymentRequired: "ክፍያ ያስፈልጋል",
+    paymentDesc: "የደህንነት ስርዓቱን ለመጠቀም እና ሪፖርቶችን ለማየት መክፈል አለብዎት።",
+    payNow: "አሁን ይክፈሉ",
+    institutions: "የተቋማት አካውንቶች",
+    addInstitution: "ተቋም ጨምር",
+    attackReports: "የጥቃት ሪፖርቶች",
+    blocked: "የተከለከለ",
+    detected: "የተገኘ",
+    telebirrWithdraw: "በቴሌ ብር ገንዘብ ማውጣት",
+    withdrawAmount: "የሚወጣው የገንዘብ መጠን",
+    withdrawPhone: "የቴሌ ብር ስልክ ቁጥር",
+    confirmWithdraw: "ማውጣቱን አረጋግጥ"
   }
 };
 
@@ -228,6 +254,13 @@ export default function SecurityDashboard() {
   const [paymentMethod, setPaymentMethod] = useState<'telebirr' | 'cbe' | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [allAttacks, setAllAttacks] = useState<SecurityLog[]>([]);
+
   // Admin States
   const [adminStats, setAdminStats] = useState<AdminStats>({
     totalUsers: 0,
@@ -235,6 +268,9 @@ export default function SecurityDashboard() {
     activeAudits: 0,
     blockedAttacks: 0
   });
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawPhone, setWithdrawPhone] = useState('');
 
   // Audit States
   const [auditTarget, setAuditTarget] = useState('');
@@ -248,10 +284,20 @@ export default function SecurityDashboard() {
   const [newSocialLink, setNewSocialLink] = useState('');
   const [newSocialPlatform, setNewSocialPlatform] = useState<SocialAccount['platform']>('telegram');
 
-  // Mounted check
+  // Load Audits
   useEffect(() => {
-    setIsMounted(true);
-  }, []);
+    if (user) {
+      const q = query(
+        collection(db, 'audits'),
+        where('userId', '==', user.uid),
+        orderBy('timestamp', 'desc')
+      );
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        setAuditResults(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AuditResult)));
+      });
+      return () => unsubscribe();
+    }
+  }, [user]);
 
   // Auth Listener
   useEffect(() => {
@@ -266,9 +312,9 @@ export default function SecurityDashboard() {
           setIsPro(profile.isPro || profile.role === 'admin');
         }
         
-        // Load Admin Stats if admin
-        if ((currentUser as any).role === 'admin' || currentUser.email === 'policeregion551@gmail.com') {
-          loadAdminStats();
+        // Load Admin Data if admin
+        if (currentUser.email === 'policeregion551@gmail.com') {
+          loadAdminData();
         }
       } else {
         setUserProfile(null);
@@ -279,33 +325,48 @@ export default function SecurityDashboard() {
     return () => unsubscribe();
   }, []);
 
-  const loadAdminStats = async () => {
-    // In real app, fetch from Firestore
-    setAdminStats({
-      totalUsers: 1240,
-      totalRevenue: 45200,
-      activeAudits: 15,
-      blockedAttacks: 842
-    });
+  const loadAdminData = async () => {
+    try {
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const usersList = usersSnap.docs.map(doc => doc.data() as UserProfile);
+      setAllUsers(usersList);
+
+      const logsSnap = await getDocs(collection(db, 'security_logs'));
+      const logsList = logsSnap.docs.map(doc => doc.data() as SecurityLog);
+      setAllAttacks(logsList);
+
+      setAdminStats({
+        totalUsers: usersList.length,
+        totalRevenue: usersList.filter(u => u.isPro).length * 299,
+        activeAudits: 12, // Mocked
+        blockedAttacks: logsList.filter(l => !l.result.isSafe).length
+      });
+    } catch (error) {
+      console.error("Failed to load admin data", error);
+    }
   };
 
   const handleAudit = async () => {
     if (!auditTarget) return;
     setIsAuditing(true);
     try {
-      const response = await fetch('/api/audit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target: auditTarget, type: auditType })
-      });
-      const data = await response.json();
+      const data = await performSecurityAudit(auditTarget, auditType);
       const newAudit: AuditResult = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: Math.random().toString(36).substr(2, 9).toUpperCase(),
         timestamp: new Date().toISOString(),
         target: auditTarget,
         type: auditType,
         ...data
       };
+      
+      // Save to Firestore
+      if (user) {
+        await addDoc(collection(db, 'audits'), {
+          ...newAudit,
+          userId: user.uid
+        });
+      }
+
       setAuditResults(prev => [newAudit, ...prev]);
       setCurrentAudit(newAudit);
       toast.success("Security Audit Completed!");
@@ -316,6 +377,33 @@ export default function SecurityDashboard() {
     }
   };
 
+  const [newInstitution, setNewInstitution] = useState({ name: '', email: '', phone: '' });
+  const [institutions, setInstitutions] = useState<any[]>([]);
+
+  const addInstitution = async () => {
+    if (!newInstitution.name) return;
+    try {
+      await addDoc(collection(db, 'institutions'), {
+        ...newInstitution,
+        createdAt: new Date().toISOString()
+      });
+      toast.success("Institution added successfully");
+      setNewInstitution({ name: '', email: '', phone: '' });
+    } catch (error) {
+      toast.error("Failed to add institution");
+    }
+  };
+
+  // Load Institutions
+  useEffect(() => {
+    if (user?.email === 'policeregion551@gmail.com') {
+      const q = query(collection(db, 'institutions'), orderBy('createdAt', 'desc'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        setInstitutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      });
+      return () => unsubscribe();
+    }
+  }, [user]);
   const addSocialAccount = () => {
     if (!newSocialLink) return;
     const newAcc: SocialAccount = {
@@ -332,6 +420,29 @@ export default function SecurityDashboard() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleWithdraw = async () => {
+    if (!withdrawAmount || !withdrawPhone) return;
+    setIsWithdrawing(true);
+    try {
+      const response = await fetch('/api/withdraw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: withdrawAmount, phone: withdrawPhone, userId: user.uid })
+      });
+      if (response.ok) {
+        toast.success("Withdrawal request sent successfully!");
+        setWithdrawAmount('');
+        setWithdrawPhone('');
+      } else {
+        toast.error("Withdrawal failed");
+      }
+    } catch (error) {
+      toast.error("Withdrawal failed");
+    } finally {
+      setIsWithdrawing(false);
+    }
   };
 
   // Firestore Real-time Logs
@@ -356,24 +467,10 @@ export default function SecurityDashboard() {
       setLogs(newLogs);
     }, (error) => {
       console.error("Firestore error:", error);
-      if (error.message.includes('permission-denied')) {
-        toast.error("Security Rules error. Please check Firestore rules.");
-      }
     });
 
     return () => unsubscribe();
   }, [user]);
-
-  const handleLogin = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-      toast.success("Successfully logged in!");
-    } catch (error) {
-      console.error("Login failed:", error);
-      toast.error("Login failed. Please try again.");
-    }
-  };
 
   const handleLogout = async () => {
     try {
@@ -389,39 +486,35 @@ export default function SecurityDashboard() {
     if (!isAutoScanning || !user) return;
 
     const interval = setInterval(async () => {
-      if (Math.random() > 0.9) { // Reduced frequency for demo
+      if (Math.random() > 0.8) {
         const randomThreat = SIMULATED_THREATS[Math.floor(Math.random() * SIMULATED_THREATS.length)];
         const sources: SecurityLog['source'][] = ['telegram', 'whatsapp', 'facebook', 'system'];
         const randomSource = sources[Math.floor(Math.random() * sources.length)];
         
-        const conn = connections.find(c => c.platform === randomSource);
-        if (conn?.isConnected && conn?.autoScan) {
-          try {
-            const result = await analyzeContent(randomThreat);
-            
-            // Save to Firestore
-            await addDoc(collection(db, 'security_logs'), {
-              userId: user.uid,
-              timestamp: new Date().toISOString(),
-              content: randomThreat,
-              source: randomSource,
-              result
+        try {
+          const result = await analyzeContent(randomThreat);
+          
+          await addDoc(collection(db, 'security_logs'), {
+            userId: user.uid,
+            timestamp: new Date().toISOString(),
+            content: randomThreat,
+            source: randomSource,
+            result
+          });
+          
+          if (!result.isSafe) {
+            toast.error(`Auto-Scan: Threat detected on ${randomSource.toUpperCase()}`, {
+              description: result.reason
             });
-            
-            if (!result.isSafe) {
-              toast.error(`Auto-Scan: Threat detected on ${randomSource.toUpperCase()}`, {
-                description: result.reason
-              });
-            }
-          } catch (e) {
-            console.error("Auto-scan failed", e);
           }
+        } catch (e) {
+          console.error("Auto-scan failed", e);
         }
       }
-    }, 30000);
+    }, 45000);
 
     return () => clearInterval(interval);
-  }, [isAutoScanning, connections, user]);
+  }, [isAutoScanning, user]);
 
   const handlePayment = async () => {
     if (!user || !paymentMethod) return;
@@ -429,7 +522,6 @@ export default function SecurityDashboard() {
     setIsPaying(true);
     toast.info(`Redirecting to ${paymentMethod === 'telebirr' ? 'Telebirr' : 'CBE'}...`);
     
-    // Simulate payment flow
     setTimeout(async () => {
       try {
         const docRef = doc(db, 'users', user.uid);
@@ -451,6 +543,7 @@ export default function SecurityDashboard() {
       }
     }, 3000);
   };
+
   const handleAnalyze = async () => {
     if (!input.trim() || !user) return;
     
@@ -460,7 +553,6 @@ export default function SecurityDashboard() {
     try {
       const result = await analyzeContent(input);
       
-      // Save to Firestore
       await addDoc(collection(db, 'security_logs'), {
         userId: user.uid,
         timestamp: new Date().toISOString(),
@@ -485,14 +577,10 @@ export default function SecurityDashboard() {
     }
   };
 
-  const totalScanned = logs.length + 340; // Simulated historical data
-  const threatsBlocked = logs.filter(l => !l.result.isSafe).length + 42;
-  const safetyScore = 94;
-
   if (!isMounted) return null;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-slate-100 font-sans selection:bg-blue-500/30">
+    <div className="min-h-screen bg-[#0a0a0a] text-slate-100 font-sans selection:bg-blue-500/30 overflow-x-hidden">
       <Toaster position="top-right" theme="dark" />
       
       {/* Navigation */}
@@ -538,7 +626,7 @@ export default function SecurityDashboard() {
               >
                 {t.connections}
               </button>
-              {user?.role === 'admin' && (
+              {user?.email === 'policeregion551@gmail.com' && (
                 <button 
                   onClick={() => setActiveTab('admin')}
                   className={`text-sm font-medium transition-colors ${activeTab === 'admin' ? 'text-amber-400' : 'text-slate-400 hover:text-white'}`}
@@ -559,7 +647,7 @@ export default function SecurityDashboard() {
               {user ? (
                 <div className="flex items-center gap-3">
                   <div className="text-right hidden sm:block">
-                    <div className="text-xs font-bold text-white">{user.displayName}</div>
+                    <div className="text-xs font-bold text-white">{user.displayName || user.email.split('@')[0]}</div>
                     <div className="text-[10px] text-slate-500">{user.email}</div>
                   </div>
                   <button 
@@ -567,15 +655,15 @@ export default function SecurityDashboard() {
                     className="h-8 w-8 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center overflow-hidden hover:border-red-500/50 transition-colors"
                   >
                     {user.photoURL ? (
-                      <img src={user.photoURL} alt="Avatar" className="w-full h-full object-cover" />
+                      <img src={user.photoURL} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
                       <Settings className="w-4 h-4 text-slate-400" />
                     )}
                   </button>
                 </div>
               ) : (
-                <Button size="sm" onClick={handleLogin} className="bg-blue-600 hover:bg-blue-700">
-                  Login
+                <Button size="sm" onClick={() => setActiveTab('auth')} className="bg-blue-600 hover:bg-blue-700">
+                  {t.login}
                 </Button>
               )}
             </div>
@@ -584,871 +672,450 @@ export default function SecurityDashboard() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {!user && !isAuthLoading ? (
+        {!user && activeTab === 'auth' ? (
           <AuthSystem onAuthComplete={(u) => setUser(u)} />
+        ) : !user ? (
+          <div className="text-center py-20 space-y-6">
+            <Shield className="w-20 h-20 text-blue-500 mx-auto animate-pulse" />
+            <h1 className="text-4xl font-bold text-white">Welcome to ShieldAI</h1>
+            <p className="text-slate-400 max-w-md mx-auto">The most advanced AI-powered security system for your digital life.</p>
+            <Button size="lg" onClick={() => setActiveTab('auth')} className="bg-blue-600 hover:bg-blue-700 px-12">
+              Get Started
+            </Button>
+          </div>
         ) : isAuthLoading ? (
           <div className="flex items-center justify-center py-40">
-            <motion.div 
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            >
-              <RefreshCw className="w-10 h-10 text-blue-500" />
-            </motion.div>
+            <RefreshCw className="w-10 h-10 text-blue-500 animate-spin" />
           </div>
         ) : (
           <>
             {activeTab === 'dashboard' && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-8"
-          >
-            {/* Monitoring Status Banner */}
-            <div className={`p-3 rounded-lg border flex items-center justify-between ${isAutoScanning ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-slate-800 border-white/10'}`}>
-              <div className="flex items-center gap-3">
-                <div className={`w-2 h-2 rounded-full ${isAutoScanning ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`} />
-                <span className="text-xs font-semibold text-slate-200 uppercase tracking-wider">
-                  {isAutoScanning ? 'Active Monitoring: Enabled' : 'Monitoring: Paused'}
-                </span>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-[10px] uppercase font-bold text-blue-400 hover:text-blue-300"
-                onClick={() => setIsAutoScanning(!isAutoScanning)}
-              >
-                {isAutoScanning ? 'Pause Service' : 'Resume Service'}
-              </Button>
-            </div>
-            {/* Hero Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="bg-slate-900/50 border-white/5 backdrop-blur-sm overflow-hidden relative group">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-slate-400 uppercase text-[10px] font-bold tracking-widest">{t.systemHealth}</CardDescription>
-                  <CardTitle className="text-3xl font-bold text-white flex items-baseline gap-2">
-                    98% <span className="text-sm font-normal text-emerald-400">Secure</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `98%` }}
-                      className="h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"
-                    />
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+                <div className={`p-3 rounded-lg border flex items-center justify-between ${isAutoScanning ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-slate-800 border-white/10'}`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2 h-2 rounded-full ${isAutoScanning ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`} />
+                    <span className="text-xs font-semibold text-slate-200 uppercase tracking-wider">
+                      {isAutoScanning ? 'Active Monitoring: Enabled' : 'Monitoring: Paused'}
+                    </span>
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-slate-900/50 border-white/5 backdrop-blur-sm">
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-slate-400 uppercase text-[10px] font-bold tracking-widest">{t.totalScanned}</CardDescription>
-                  <CardTitle className="text-3xl font-bold text-white">1,284</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xs text-slate-500 flex items-center gap-1">
-                    <ArrowRight className="w-3 h-3 text-emerald-400 rotate-[-45deg]" />
-                    <span className="text-emerald-400 font-medium">+12%</span> from yesterday
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-slate-900/50 border-white/5 backdrop-blur-sm">
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-slate-400 uppercase text-[10px] font-bold tracking-widest">{t.threatsBlocked}</CardDescription>
-                  <CardTitle className="text-3xl font-bold text-red-400">42</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xs text-slate-500 flex items-center gap-1">
-                    <ShieldAlert className="w-3 h-3 text-red-400" />
-                    <span className="text-red-400 font-medium">Critical</span> action required for 2 items
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Quick Scan */}
-            <Card className="bg-slate-900/50 border-white/5 backdrop-blur-sm border-l-4 border-l-blue-500">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-blue-400 fill-blue-400" />
-                  {t.scanner}
-                </CardTitle>
-                <CardDescription>{t.placeholder}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <Input 
-                      placeholder={t.placeholder} 
-                      className="bg-black/50 border-white/10 pl-10 h-12 text-white focus-visible:ring-blue-500"
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
-                    />
-                  </div>
-                  <Button 
-                    className="h-12 px-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg shadow-blue-600/20"
-                    onClick={handleAnalyze}
-                    disabled={isAnalyzing || !input.trim()}
-                  >
-                    {isAnalyzing ? t.scanning : t.analyze}
+                  <Button variant="ghost" size="sm" className="text-[10px] uppercase font-bold text-blue-400" onClick={() => setIsAutoScanning(!isAutoScanning)}>
+                    {isAutoScanning ? 'Pause Service' : 'Resume Service'}
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Recent Activity */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <Card className="bg-slate-900/50 border-white/5 overflow-hidden">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg font-semibold">{t.recentLogs}</CardTitle>
-                    <CardDescription>Real-time monitoring results</CardDescription>
-                  </div>
-                  <History className="w-5 h-5 text-slate-500" />
-                </CardHeader>
-                <CardContent className="p-0">
-                  <ScrollArea className="h-[400px]">
-                    <div className="divide-y divide-white/5">
-                      {logs.length === 0 ? (
-                        <div className="text-center py-12">
-                          <p className="text-slate-500">{t.noLogs}</p>
-                        </div>
-                      ) : (
-                        logs.map((log) => (
-                          <div key={log.id} className="p-4 hover:bg-white/5 transition-colors group">
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex items-start gap-3">
-                                <div className={`mt-1 w-8 h-8 rounded-lg flex items-center justify-center ${
-                                  log.result.isSafe ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'
-                                }`}>
-                                  {log.result.isSafe ? <ShieldCheck className="w-5 h-5" /> : <ShieldAlert className="w-5 h-5" />}
-                                </div>
-                                <div>
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <Badge variant="outline" className="text-[10px] uppercase tracking-tighter border-white/10 bg-black/20">
-                                      {log.source}
-                                    </Badge>
-                                    <span className="text-[10px] text-slate-500 font-mono">
-                                      {new Date(log.timestamp).toLocaleTimeString()}
-                                    </span>
-                                  </div>
-                                  <p className="text-sm font-medium text-slate-200 line-clamp-1 mb-1">{log.content}</p>
-                                  <p className="text-xs text-slate-400 line-clamp-2">{log.result.reason}</p>
-                                </div>
-                              </div>
-                              <div className="flex flex-col items-end gap-2">
-                                <div className={`text-xs font-bold ${
-                                  log.result.score > 80 ? 'text-emerald-400' : log.result.score > 40 ? 'text-amber-400' : 'text-red-400'
-                                }`}>
-                                  {log.result.score}% {log.result.isSafe ? t.safe : t.unsafe}
-                                </div>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <ExternalLink className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-slate-900/50 border-white/5">
-                <CardHeader>
-                  <CardTitle className="text-lg font-semibold">Threat Trends</CardTitle>
-                  <CardDescription>Phishing attempts over the last 7 days</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={MOCK_STATS}>
-                        <defs>
-                          <linearGradient id="colorThreats" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                        <XAxis 
-                          dataKey="date" 
-                          stroke="#64748b" 
-                          fontSize={12} 
-                          tickLine={false} 
-                          axisLine={false} 
-                        />
-                        <YAxis 
-                          stroke="#64748b" 
-                          fontSize={12} 
-                          tickLine={false} 
-                          axisLine={false} 
-                        />
-                        <Tooltip 
-                          contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #ffffff10', borderRadius: '8px' }}
-                          itemStyle={{ color: '#ef4444' }}
-                        />
-                        <Area 
-                          type="monotone" 
-                          dataKey="threats" 
-                          stroke="#ef4444" 
-                          strokeWidth={2}
-                          fillOpacity={1} 
-                          fill="url(#colorThreats)" 
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="mt-6 p-4 rounded-xl bg-blue-500/5 border border-blue-500/10 flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                      <AlertCircle className="w-5 h-5 text-blue-400" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold text-white">AI Insight</h4>
-                      <p className="text-xs text-slate-400">We noticed an 18% increase in WhatsApp phishing attempts this week. Stay vigilant.</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </motion.div>
-        )}
-
-        {activeTab === 'analysis' && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="max-w-3xl mx-auto space-y-8"
-          >
-            <div className="text-center space-y-4">
-              <h2 className="text-4xl font-bold text-white tracking-tight">{t.scanner}</h2>
-              <p className="text-slate-400">{t.placeholder}</p>
-            </div>
-
-            <Card className="bg-slate-900/50 border-white/5 p-8">
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-300">Content to Analyze</label>
-                  <textarea 
-                    className="w-full h-40 bg-black/50 border border-white/10 rounded-xl p-4 text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none transition-all"
-                    placeholder="Paste a suspicious message, email snippet, or URL here..."
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                    <div className="flex items-center gap-2 mb-2">
-                      <MessageSquare className="w-4 h-4 text-blue-400" />
-                      <span className="text-xs font-semibold text-slate-300">Social Media</span>
-                    </div>
-                    <p className="text-[10px] text-slate-500">Optimized for Telegram, FB, and WhatsApp patterns.</p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Lock className="w-4 h-4 text-emerald-400" />
-                      <span className="text-xs font-semibold text-slate-300">Privacy First</span>
-                    </div>
-                    <p className="text-[10px] text-slate-500">Your data is processed securely and never stored.</p>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <Card className="bg-slate-900/50 border-white/5 backdrop-blur-sm">
+                    <CardHeader className="pb-2">
+                      <CardDescription className="text-slate-400 uppercase text-[10px] font-bold tracking-widest">{t.systemHealth}</CardDescription>
+                      <CardTitle className="text-3xl font-bold text-white">98% <span className="text-sm font-normal text-emerald-400">Secure</span></CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-500 w-[98%]" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-slate-900/50 border-white/5 backdrop-blur-sm">
+                    <CardHeader className="pb-2">
+                      <CardDescription className="text-slate-400 uppercase text-[10px] font-bold tracking-widest">{t.totalScanned}</CardDescription>
+                      <CardTitle className="text-3xl font-bold text-white">{logs.length + 1240}</CardTitle>
+                    </CardHeader>
+                  </Card>
+                  <Card className="bg-slate-900/50 border-white/5 backdrop-blur-sm">
+                    <CardHeader className="pb-2">
+                      <CardDescription className="text-slate-400 uppercase text-[10px] font-bold tracking-widest">{t.threatsBlocked}</CardDescription>
+                      <CardTitle className="text-3xl font-bold text-red-400">{logs.filter(l => !l.result.isSafe).length + 42}</CardTitle>
+                    </CardHeader>
+                  </Card>
                 </div>
 
-                <Button 
-                  className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-lg font-bold shadow-xl shadow-blue-600/20"
-                  onClick={handleAnalyze}
-                  disabled={isAnalyzing || !input.trim()}
-                >
-                  {isAnalyzing ? (
-                    <div className="flex items-center gap-2">
-                      <motion.div 
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      >
-                        <Shield className="w-5 h-5" />
-                      </motion.div>
-                      {t.scanning}
-                    </div>
-                  ) : t.analyze}
-                </Button>
-              </div>
-            </Card>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex flex-col items-center text-center p-4">
-                <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center mb-3">
-                  <CheckCircle2 className="w-6 h-6 text-blue-400" />
-                </div>
-                <h4 className="text-sm font-bold text-white">URL Reputation</h4>
-                <p className="text-xs text-slate-500">Checks against global blacklists and WHOIS data.</p>
-              </div>
-              <div className="flex flex-col items-center text-center p-4">
-                <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center mb-3">
-                  <Zap className="w-6 h-6 text-purple-400" />
-                </div>
-                <h4 className="text-sm font-bold text-white">Semantic Analysis</h4>
-                <p className="text-xs text-slate-500">Detects social engineering and urgency tactics.</p>
-              </div>
-              <div className="flex flex-col items-center text-center p-4">
-                <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mb-3">
-                  <ShieldCheck className="w-6 h-6 text-emerald-400" />
-                </div>
-                <h4 className="text-sm font-bold text-white">Zero-Day Detection</h4>
-                <p className="text-xs text-slate-500">AI identifies new threats before they are reported.</p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {activeTab === 'reports' && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="space-y-8"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-white">Security Intelligence</h2>
-                <p className="text-slate-400">Detailed breakdown of your digital safety.</p>
-              </div>
-              <Button variant="outline" className="border-white/10 text-slate-300 gap-2">
-                <Download className="w-4 h-4" />
-                Export PDF
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <Card className="lg:col-span-2 bg-slate-900/50 border-white/5">
-                <CardHeader>
-                  <CardTitle>Daily Activity</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[400px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={MOCK_STATS}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" />
-                        <XAxis dataKey="date" stroke="#64748b" />
-                        <YAxis stroke="#64748b" />
-                        <Tooltip 
-                          contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #ffffff10' }}
-                        />
-                        <Line type="monotone" dataKey="scanned" stroke="#3b82f6" strokeWidth={3} dot={{ fill: '#3b82f6' }} />
-                        <Line type="monotone" dataKey="threats" stroke="#ef4444" strokeWidth={3} dot={{ fill: '#ef4444' }} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="space-y-6">
-                <Card className="bg-slate-900/50 border-white/5">
+                <Card className="bg-slate-900/50 border-white/5 border-l-4 border-l-blue-500">
                   <CardHeader>
-                    <CardTitle className="text-sm">Threat Distribution</CardTitle>
+                    <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                      <Zap className="w-5 h-5 text-blue-400 fill-blue-400" />
+                      {t.scanner}
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-400">Phishing</span>
-                        <span className="text-white">64%</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-red-500 w-[64%]" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-400">Malware Links</span>
-                        <span className="text-white">22%</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-amber-500 w-[22%]" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-400">Scams</span>
-                        <span className="text-white">14%</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500 w-[14%]" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-blue-600 to-indigo-700 border-none text-white">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Pro Insights</CardTitle>
-                    <CardDescription className="text-blue-100">Unlock advanced behavioral analytics and dark web monitoring.</CardDescription>
-                  </CardHeader>
-                  <CardFooter>
-                    <Button variant="secondary" className="w-full font-bold" onClick={() => setActiveTab('pricing')}>
-                      View Pro Features
-                    </Button>
-                  </CardFooter>
-                </Card>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {user?.role === 'admin' && activeTab === 'admin' && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="space-y-8"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <Card className="bg-slate-900/50 border-amber-500/20">
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-slate-400 uppercase text-[10px] font-bold">{t.revenue}</CardDescription>
-                  <CardTitle className="text-2xl font-bold text-amber-400">{adminStats.totalRevenue} ETB</CardTitle>
-                </CardHeader>
-                <CardFooter>
-                  <Button size="sm" className="w-full bg-amber-600 hover:bg-amber-700 gap-2">
-                    <Wallet className="w-4 h-4" />
-                    {t.withdraw}
-                  </Button>
-                </CardFooter>
-              </Card>
-              <Card className="bg-slate-900/50 border-white/5">
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-slate-400 uppercase text-[10px] font-bold">{t.users}</CardDescription>
-                  <CardTitle className="text-2xl font-bold text-white">{adminStats.totalUsers}</CardTitle>
-                </CardHeader>
-              </Card>
-              <Card className="bg-slate-900/50 border-white/5">
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-slate-400 uppercase text-[10px] font-bold">Active Audits</CardDescription>
-                  <CardTitle className="text-2xl font-bold text-white">{adminStats.activeAudits}</CardTitle>
-                </CardHeader>
-              </Card>
-              <Card className="bg-slate-900/50 border-white/5">
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-slate-400 uppercase text-[10px] font-bold">Blocked Attacks</CardDescription>
-                  <CardTitle className="text-2xl font-bold text-emerald-400">{adminStats.blockedAttacks}</CardTitle>
-                </CardHeader>
-              </Card>
-            </div>
-
-            <Card className="bg-slate-900/50 border-white/5">
-              <CardHeader>
-                <CardTitle>System Activity Monitoring</CardTitle>
-                <CardDescription>Real-time overview of all scans and threats across the platform.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={MOCK_STATS}>
-                      <defs>
-                        <linearGradient id="colorScanned" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                      <XAxis dataKey="date" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                      <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
-                        itemStyle={{ color: '#fff' }}
+                  <CardContent>
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <Input 
+                        placeholder={t.placeholder} 
+                        className="bg-black/50 border-white/10 h-12 text-white"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
                       />
-                      <Area type="monotone" dataKey="scanned" stroke="#3b82f6" fillOpacity={1} fill="url(#colorScanned)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        {activeTab === 'audit' && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-8"
-          >
-            <div className="text-center space-y-4 mb-12">
-              <h2 className="text-4xl font-bold text-white tracking-tight">{t.auditTitle}</h2>
-              <p className="text-slate-400">{t.auditDesc}</p>
-            </div>
-
-            <Card className="bg-slate-900/50 border-white/5 p-6">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1 space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase">{t.auditTarget}</label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
-                    <Input 
-                      placeholder="https://example.com or project-folder/"
-                      className="pl-10 bg-black/40 border-white/10 text-white h-12"
-                      value={auditTarget}
-                      onChange={(e) => setAuditTarget(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="w-full md:w-48 space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Type</label>
-                  <select 
-                    className="w-full h-12 bg-black/40 border-white/10 text-white rounded-md px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                    value={auditType}
-                    onChange={(e: any) => setAuditType(e.target.value)}
-                  >
-                    <option value="url">Website URL</option>
-                    <option value="code">Source Code</option>
-                  </select>
-                </div>
-                <div className="flex items-end">
-                  <Button 
-                    className="h-12 bg-blue-600 hover:bg-blue-700 px-8 gap-2"
-                    onClick={handleAudit}
-                    disabled={isAuditing}
-                  >
-                    {isAuditing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                    {t.startAudit}
-                  </Button>
-                </div>
-              </div>
-            </Card>
-
-            {currentAudit && (
-              <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}>
-                <Card className="bg-slate-900/50 border-blue-500/30 overflow-hidden print:bg-white print:text-black print:border-none">
-                  <CardHeader className="bg-blue-600/10 border-b border-white/5 flex flex-row items-center justify-between">
-                    <div>
-                      <CardTitle className="text-2xl flex items-center gap-3">
-                        {t.auditSummary}
-                        <Badge className={currentAudit.status === 'pass' ? 'bg-emerald-500' : currentAudit.status === 'fail' ? 'bg-red-500' : 'bg-amber-500'}>
-                          {t[currentAudit.status as keyof typeof t]}
-                        </Badge>
-                      </CardTitle>
-                      <CardDescription>{currentAudit.target} - {new Date(currentAudit.timestamp).toLocaleString()}</CardDescription>
-                    </div>
-                    <div className="flex gap-2 print:hidden">
-                      <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
-                        <Printer className="w-4 h-4" />
-                        {t.print}
+                      <Button className="h-12 px-8 bg-blue-600 hover:bg-blue-700" onClick={handleAnalyze} disabled={isAnalyzing || !input.trim()}>
+                        {isAnalyzing ? t.scanning : t.analyze}
                       </Button>
                     </div>
-                  </CardHeader>
-                  <CardContent className="p-8 space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                      <div className="text-center p-6 rounded-2xl bg-black/20 border border-white/5">
-                        <div className="text-4xl font-black text-blue-400 mb-2">{currentAudit.score}%</div>
-                        <div className="text-xs uppercase font-bold text-slate-500">Security Score</div>
-                      </div>
-                      <div className="col-span-2 space-y-4">
-                        <h4 className="font-bold text-white flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4 text-amber-500" />
-                          {t.findings}
-                        </h4>
-                        <div className="space-y-3">
-                          {currentAudit.findings.map((f: any, i: number) => (
-                            <div key={i} className="p-4 rounded-lg bg-white/5 border-l-4 border-amber-500">
-                              <div className="flex justify-between items-start mb-1">
-                                <span className="text-sm font-bold text-white">{f.issue}</span>
-                                <Badge variant="outline" className="text-[10px] uppercase">{f.severity}</Badge>
-                              </div>
-                              <p className="text-xs text-slate-400">Fix: {f.fix}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-12 border-4 border-double border-blue-500/20 rounded-3xl text-center space-y-6 relative overflow-hidden">
-                      <div className="absolute top-0 right-0 p-4 opacity-10">
-                        <Shield className="w-40 h-40" />
-                      </div>
-                      <h3 className="text-3xl font-serif italic text-white">{t.certificate}</h3>
-                      <div className="max-w-md mx-auto space-y-4">
-                        <p className="text-slate-400">This document certifies that the system at <strong>{currentAudit.target}</strong> has undergone a rigorous AI-driven security audit.</p>
-                        <div className="flex justify-center gap-8 py-4">
-                          <div className="text-center">
-                            <div className="font-mono text-xs text-slate-500">Certificate ID</div>
-                            <div className="font-bold text-white">{currentAudit.id}</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-mono text-xs text-slate-500">Verification Date</div>
-                            <div className="font-bold text-white">{new Date(currentAudit.timestamp).toLocaleDateString()}</div>
-                          </div>
-                        </div>
-                        <div className="pt-8 flex flex-col items-center">
-                          <div className="w-32 h-1 bg-blue-500 mb-2" />
-                          <div className="text-xs font-bold text-slate-500 uppercase tracking-widest">ShieldAI Security Authority</div>
-                        </div>
-                      </div>
-                    </div>
                   </CardContent>
                 </Card>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <Card className="bg-slate-900/50 border-white/5 overflow-hidden">
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle className="text-lg font-semibold">{t.recentLogs}</CardTitle>
+                      <History className="w-5 h-5 text-slate-500" />
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <ScrollArea className="h-[400px]">
+                        <div className="divide-y divide-white/5">
+                          {logs.length === 0 ? (
+                            <div className="text-center py-12 text-slate-500">{t.noLogs}</div>
+                          ) : (
+                            logs.map((log) => (
+                              <div key={log.id} className="p-4 hover:bg-white/5 transition-colors">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex items-start gap-3">
+                                    <div className={`mt-1 w-8 h-8 rounded-lg flex items-center justify-center ${log.result.isSafe ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                                      {log.result.isSafe ? <ShieldCheck className="w-5 h-5" /> : <ShieldAlert className="w-5 h-5" />}
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <Badge variant="outline" className="text-[10px] uppercase">{log.source}</Badge>
+                                        <span className="text-[10px] text-slate-500">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                                      </div>
+                                      <p className="text-sm font-medium text-slate-200 line-clamp-1">{log.content}</p>
+                                      <p className="text-xs text-slate-400 line-clamp-2">{log.result.reason}</p>
+                                    </div>
+                                  </div>
+                                  <div className={`text-xs font-bold ${log.result.isSafe ? 'text-emerald-400' : 'text-red-400'}`}>
+                                    {log.result.score}% {log.result.isSafe ? t.safe : t.unsafe}
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-slate-900/50 border-white/5">
+                    <CardHeader>
+                      <CardTitle className="text-lg font-semibold">Threat Trends</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={MOCK_STATS}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                            <XAxis dataKey="date" stroke="#64748b" fontSize={12} />
+                            <YAxis stroke="#64748b" fontSize={12} />
+                            <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #ffffff10' }} />
+                            <Area type="monotone" dataKey="threats" stroke="#ef4444" fill="#ef4444" fillOpacity={0.1} />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               </motion.div>
             )}
-          </motion.div>
-        )}
 
-        {activeTab === 'connections' && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-8"
-          >
-            <div className="text-center space-y-4 mb-12">
-              <h2 className="text-4xl font-bold text-white tracking-tight">{t.socialTitle}</h2>
-              <p className="text-slate-400">{t.socialDesc}</p>
-            </div>
-
-            <Card className="bg-slate-900/50 border-white/5 p-6">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1 space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase">{t.addAccount}</label>
-                  <div className="relative">
-                    <Link2 className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
-                    <Input 
-                      placeholder="https://t.me/username or profile link"
-                      className="pl-10 bg-black/40 border-white/10 text-white h-12"
-                      value={newSocialLink}
-                      onChange={(e) => setNewSocialLink(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="w-full md:w-48 space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Platform</label>
-                  <select 
-                    className="w-full h-12 bg-black/40 border-white/10 text-white rounded-md px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                    value={newSocialPlatform}
-                    onChange={(e: any) => setNewSocialPlatform(e.target.value)}
-                  >
-                    <option value="telegram">Telegram</option>
-                    <option value="facebook">Facebook</option>
-                    <option value="whatsapp">WhatsApp</option>
-                    <option value="email">Email Account</option>
-                    <option value="instagram">Instagram</option>
-                  </select>
-                </div>
-                <div className="flex items-end">
-                  <Button 
-                    className="h-12 bg-blue-600 hover:bg-blue-700 px-8 gap-2"
-                    onClick={addSocialAccount}
-                  >
-                    <Plus className="w-4 h-4" />
-                    Connect
-                  </Button>
-                </div>
-              </div>
-            </Card>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {socialAccounts.map((acc) => (
-                <Card key={acc.id} className="bg-slate-900/50 border-white/5 overflow-hidden group">
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-blue-600/10 flex items-center justify-center text-blue-400">
-                        {acc.platform === 'telegram' && <Send className="w-5 h-5" />}
-                        {acc.platform === 'facebook' && <Facebook className="w-5 h-5" />}
-                        {acc.platform === 'whatsapp' && <MessageSquare className="w-5 h-5" />}
-                        {acc.platform === 'email' && <Mail className="w-5 h-5" />}
-                        {acc.platform === 'instagram' && <Smartphone className="w-5 h-5" />}
-                      </div>
-                      <div>
-                        <CardTitle className="text-base">{acc.link}</CardTitle>
-                        <CardDescription className="text-[10px] uppercase font-bold tracking-widest">{acc.platform}</CardDescription>
-                      </div>
-                    </div>
-                    <Badge className={acc.status === 'protected' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}>
-                      {t[acc.status as keyof typeof t]}
-                    </Badge>
-                  </CardHeader>
-                  <CardContent className="py-4">
-                    <div className="flex items-center justify-between text-xs text-slate-400">
-                      <div className="flex items-center gap-2">
-                        <Activity className="w-3 h-3 text-emerald-500" />
-                        Live Protection Active
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <ShieldAlert className="w-3 h-3 text-red-400" />
-                        {acc.attackCount} Attacks Blocked
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="bg-white/5 p-2 flex gap-2">
-                    <Button variant="ghost" size="sm" className="flex-1 text-[10px] uppercase font-bold text-slate-400 hover:text-white">
-                      View Logs
-                    </Button>
-                    <Button variant="ghost" size="sm" className="flex-1 text-[10px] uppercase font-bold text-red-400 hover:bg-red-500/10">
-                      Disconnect
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          </motion.div>
-        )}
-
-        {activeTab === 'pricing' && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-5xl mx-auto space-y-12 py-12"
-          >
-            <div className="text-center space-y-4">
-              <h2 className="text-5xl font-extrabold text-white tracking-tight">ዲጂታል ህይወትዎን ይጠብቁ (Protect Your Digital Life)</h2>
-              <p className="text-xl text-slate-400">ለእርስዎ የሚስማማውን የደህንነት አማራጭ ይምረጡ።</p>
-              <div className="text-xs text-blue-400 font-mono">በም/ኢ/ር ቢኒያም ይርሳዉ መጢና የበለፀገ</div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <Card className="bg-slate-900/50 border-white/5 p-8 flex flex-col">
-                <div className="mb-8">
-                  <h3 className="text-2xl font-bold text-white mb-2">Free Plan</h3>
-                  <div className="text-4xl font-bold text-white mb-4">0 ETB <span className="text-sm font-normal text-slate-500">/ month</span></div>
-                  <p className="text-slate-400 text-sm">Basic protection for casual browsing.</p>
-                </div>
-                <ul className="space-y-4 mb-8 flex-1">
-                  <li className="flex items-center gap-3 text-sm text-slate-300">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                    Manual AI Scanning (10/day)
-                  </li>
-                  <li className="flex items-center gap-3 text-sm text-slate-300">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                    Basic Phishing Detection
-                  </li>
-                  <li className="flex items-center gap-3 text-sm text-slate-300">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                    7-Day History
-                  </li>
-                </ul>
-                <Button variant="outline" className="w-full border-white/10 text-white" disabled>Current Plan</Button>
-              </Card>
-
-              <Card className="bg-slate-900/50 border-blue-500/50 p-8 flex flex-col relative overflow-hidden shadow-[0_0_40px_rgba(37,99,235,0.15)]">
-                <div className="absolute top-4 right-4 bg-blue-600 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">Most Popular</div>
-                <div className="mb-8">
-                  <h3 className="text-2xl font-bold text-white mb-2">ShieldAI Pro</h3>
-                  <div className="text-4xl font-bold text-white mb-4">299 ETB <span className="text-sm font-normal text-slate-500">/ month</span></div>
-                  <p className="text-slate-400 text-sm">The ultimate defense for power users.</p>
-                </div>
-                <ul className="space-y-4 mb-8 flex-1">
-                  <li className="flex items-center gap-3 text-sm text-slate-300">
-                    <Zap className="w-5 h-5 text-blue-400 fill-blue-400" />
-                    Unlimited AI Deep Scans
-                  </li>
-                  <li className="flex items-center gap-3 text-sm text-slate-300">
-                    <Zap className="w-5 h-5 text-blue-400 fill-blue-400" />
-                    Real-time App Monitoring (Telegram/WA)
-                  </li>
-                  <li className="flex items-center gap-3 text-sm text-slate-300">
-                    <Zap className="w-5 h-5 text-blue-400 fill-blue-400" />
-                    Dark Web Identity Monitoring
-                  </li>
-                  <li className="flex items-center gap-3 text-sm text-slate-300">
-                    <Zap className="w-5 h-5 text-blue-400 fill-blue-400" />
-                    Priority AI Analysis (Gemini 3.1 Pro)
-                  </li>
-                  <li className="flex items-center gap-3 text-sm text-slate-300">
-                    <Zap className="w-5 h-5 text-blue-400 fill-blue-400" />
-                    Family Protection (up to 5 devices)
-                  </li>
-                </ul>
-                
-                {isPro ? (
-                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12" disabled>
-                    <CheckCircle2 className="w-5 h-5 mr-2" />
-                    Pro Active
-                  </Button>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button 
-                        variant={paymentMethod === 'telebirr' ? 'default' : 'outline'}
-                        className={`h-12 border-white/10 ${paymentMethod === 'telebirr' ? 'bg-blue-600' : 'text-white'}`}
-                        onClick={() => setPaymentMethod('telebirr')}
-                      >
-                        <Smartphone className="w-4 h-4 mr-2" />
-                        Telebirr
-                      </Button>
-                      <Button 
-                        variant={paymentMethod === 'cbe' ? 'default' : 'outline'}
-                        className={`h-12 border-white/10 ${paymentMethod === 'cbe' ? 'bg-blue-600' : 'text-white'}`}
-                        onClick={() => setPaymentMethod('cbe')}
-                      >
-                        <Shield className="w-4 h-4 mr-2" />
-                        CBE Birr
-                      </Button>
-                    </div>
-                    
-                    <Button 
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12"
-                      disabled={!paymentMethod || isPaying}
-                      onClick={handlePayment}
-                    >
-                      {isPaying ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : "ክፍያ ፈጽም (Pay Now)"}
+            {activeTab === 'analysis' && (
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-3xl mx-auto space-y-8">
+                {!isPro && (
+                  <div className="p-6 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center mb-8">
+                    <Lock className="w-10 h-10 text-amber-500 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-white">{t.paymentRequired}</h3>
+                    <p className="text-slate-400 mb-6">{t.paymentDesc}</p>
+                    <Button onClick={() => setActiveTab('pricing')} className="bg-amber-600 hover:bg-amber-700">
+                      {t.payNow}
                     </Button>
                   </div>
                 )}
-              </Card>
-            </div>
+                <div className={!isPro ? 'opacity-50 pointer-events-none' : ''}>
+                  <div className="text-center space-y-4">
+                    <h2 className="text-4xl font-bold text-white">{t.scanner}</h2>
+                    <p className="text-slate-400">{t.placeholder}</p>
+                  </div>
+                  <Card className="bg-slate-900/50 border-white/5 p-8 mt-8">
+                    <textarea 
+                      className="w-full h-40 bg-black/50 border border-white/10 rounded-xl p-4 text-white outline-none resize-none"
+                      placeholder="Paste a suspicious message or URL here..."
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                    />
+                    <Button className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-lg font-bold mt-6" onClick={handleAnalyze} disabled={isAnalyzing || !input.trim()}>
+                      {isAnalyzing ? t.scanning : t.analyze}
+                    </Button>
+                  </Card>
+                </div>
+              </motion.div>
+            )}
 
-            <div className="p-8 rounded-2xl bg-white/5 border border-white/10 flex flex-col md:flex-row items-center justify-between gap-8">
-              <div className="space-y-2">
-                <h4 className="text-xl font-bold text-white">Enterprise Security</h4>
-                <p className="text-slate-400 text-sm">Need to protect your entire organization? We offer custom solutions.</p>
-              </div>
-              <Button variant="outline" className="border-white/10 text-white gap-2">
-                Contact Sales
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </motion.div>
-        )}
+            {activeTab === 'audit' && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+                {!isPro && (
+                  <div className="p-6 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center mb-8">
+                    <Lock className="w-10 h-10 text-amber-500 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-white">{t.paymentRequired}</h3>
+                    <p className="text-slate-400 mb-6">{t.paymentDesc}</p>
+                    <Button onClick={() => setActiveTab('pricing')} className="bg-amber-600 hover:bg-amber-700">
+                      {t.payNow}
+                    </Button>
+                  </div>
+                )}
+                <div className={!isPro ? 'opacity-50 pointer-events-none' : ''}>
+                  <div className="text-center space-y-4">
+                    <h2 className="text-4xl font-bold text-white">{t.auditTitle}</h2>
+                    <p className="text-slate-400">{t.auditDesc}</p>
+                  </div>
+                  <Card className="bg-slate-900/50 border-white/5 p-6 mt-8">
+                    <div className="flex flex-col md:flex-row gap-4">
+                      <Input 
+                        placeholder="https://example.com or project-folder/"
+                        className="bg-black/40 border-white/10 text-white h-12"
+                        value={auditTarget}
+                        onChange={(e) => setAuditTarget(e.target.value)}
+                      />
+                      <select 
+                        className="bg-black/40 border-white/10 text-white rounded-md px-3 h-12"
+                        value={auditType}
+                        onChange={(e: any) => setAuditType(e.target.value)}
+                      >
+                        <option value="url">Website URL</option>
+                        <option value="code">Source Code</option>
+                      </select>
+                      <Button className="h-12 bg-blue-600 hover:bg-blue-700 px-8" onClick={handleAudit} disabled={isAuditing}>
+                        {isAuditing ? <RefreshCw className="animate-spin" /> : t.startAudit}
+                      </Button>
+                    </div>
+                  </Card>
+                </div>
+
+                {currentAudit && (
+                  <Card className="bg-slate-900/50 border-blue-500/30 overflow-hidden print:bg-white print:text-black">
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <div>
+                        <CardTitle className="text-2xl flex items-center gap-3">
+                          {t.auditSummary}
+                          <Badge className={currentAudit.status === 'pass' ? 'bg-emerald-500' : 'bg-red-500'}>
+                            {t[currentAudit.status as keyof typeof t]}
+                          </Badge>
+                        </CardTitle>
+                        <CardDescription>{currentAudit.target}</CardDescription>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={handlePrint} className="print:hidden">
+                        <Printer className="w-4 h-4 mr-2" /> {t.print}
+                      </Button>
+                    </CardHeader>
+                    <CardContent className="p-8 space-y-8">
+                      <div className="p-12 border-4 border-double border-blue-500/20 rounded-3xl text-center space-y-6">
+                        <h3 className="text-3xl font-serif italic text-white print:text-black">{t.certificate}</h3>
+                        <p className="text-slate-400 print:text-black">This document certifies that <strong>{currentAudit.target}</strong> has undergone a rigorous AI-driven security audit.</p>
+                        <div className="flex justify-center gap-8 py-4">
+                          <div>
+                            <div className="text-xs text-slate-500">Certificate ID</div>
+                            <div className="font-bold text-white print:text-black">{currentAudit.id}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-slate-500">Date</div>
+                            <div className="font-bold text-white print:text-black">{new Date(currentAudit.timestamp).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </motion.div>
+            )}
+
+            {activeTab === 'connections' && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+                <div className="text-center space-y-4">
+                  <h2 className="text-4xl font-bold text-white">{t.socialTitle}</h2>
+                  <p className="text-slate-400">{t.socialDesc}</p>
+                </div>
+                <Card className="bg-slate-900/50 border-white/5 p-6">
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <Input 
+                      placeholder="Account link or username"
+                      className="bg-black/40 border-white/10 text-white h-12"
+                      value={newSocialLink}
+                      onChange={(e) => setNewSocialLink(e.target.value)}
+                    />
+                    <select 
+                      className="bg-black/40 border-white/10 text-white rounded-md px-3 h-12"
+                      value={newSocialPlatform}
+                      onChange={(e: any) => setNewSocialPlatform(e.target.value)}
+                    >
+                      <option value="telegram">Telegram</option>
+                      <option value="facebook">Facebook</option>
+                      <option value="whatsapp">WhatsApp</option>
+                    </select>
+                    <Button className="h-12 bg-blue-600 hover:bg-blue-700 px-8" onClick={addSocialAccount}>
+                      Connect
+                    </Button>
+                  </div>
+                </Card>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {socialAccounts.map((acc) => (
+                    <Card key={acc.id} className="bg-slate-900/50 border-white/5">
+                      <CardHeader className="flex flex-row items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-blue-600/10 flex items-center justify-center text-blue-400">
+                            {acc.platform === 'telegram' ? <Send /> : <Facebook />}
+                          </div>
+                          <div>
+                            <CardTitle className="text-base">{acc.link}</CardTitle>
+                            <CardDescription className="text-xs uppercase">{acc.platform}</CardDescription>
+                          </div>
+                        </div>
+                        <Badge className="bg-emerald-500/20 text-emerald-400">{t.protected}</Badge>
+                      </CardHeader>
+                    </Card>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {user?.email === 'policeregion551@gmail.com' && activeTab === 'admin' && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <Card className="bg-slate-900/50 border-amber-500/20">
+                    <CardHeader className="pb-2">
+                      <CardDescription className="text-slate-400 uppercase text-[10px] font-bold">{t.revenue}</CardDescription>
+                      <CardTitle className="text-2xl font-bold text-amber-400">{adminStats.totalRevenue} ETB</CardTitle>
+                    </CardHeader>
+                    <CardFooter>
+                      <Button size="sm" className="w-full bg-amber-600" onClick={() => setIsWithdrawing(true)}>
+                        <Wallet className="w-4 h-4 mr-2" /> {t.withdraw}
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                  <Card className="bg-slate-900/50 border-white/5">
+                    <CardHeader className="pb-2">
+                      <CardDescription className="text-slate-400 uppercase text-[10px] font-bold">{t.users}</CardDescription>
+                      <CardTitle className="text-2xl font-bold text-white">{adminStats.totalUsers}</CardTitle>
+                    </CardHeader>
+                  </Card>
+                  <Card className="bg-slate-900/50 border-white/5">
+                    <CardHeader className="pb-2">
+                      <CardDescription className="text-slate-400 uppercase text-[10px] font-bold">Attacks Blocked</CardDescription>
+                      <CardTitle className="text-2xl font-bold text-emerald-400">{adminStats.blockedAttacks}</CardTitle>
+                    </CardHeader>
+                  </Card>
+                </div>
+
+                {isWithdrawing && (
+                  <Card className="bg-slate-900 border-amber-500/50 p-6">
+                    <CardTitle className="mb-4">{t.telebirrWithdraw}</CardTitle>
+                    <div className="space-y-4">
+                      <Input 
+                        placeholder={t.withdrawAmount} 
+                        type="number" 
+                        value={withdrawAmount} 
+                        onChange={(e) => setWithdrawAmount(e.target.value)}
+                        className="bg-black/40 border-white/10"
+                      />
+                      <Input 
+                        placeholder={t.withdrawPhone} 
+                        value={withdrawPhone} 
+                        onChange={(e) => setWithdrawPhone(e.target.value)}
+                        className="bg-black/40 border-white/10"
+                      />
+                      <div className="flex gap-4">
+                        <Button className="flex-1 bg-amber-600 hover:bg-amber-700" onClick={handleWithdraw} disabled={isWithdrawing}>
+                          {t.confirmWithdraw}
+                        </Button>
+                        <Button variant="ghost" className="flex-1" onClick={() => setIsWithdrawing(false)}>Cancel</Button>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                <Tabs defaultValue="users">
+                  <TabsList className="bg-slate-900 border-white/5">
+                    <TabsTrigger value="users">{t.users}</TabsTrigger>
+                    <TabsTrigger value="institutions">{t.institutions}</TabsTrigger>
+                    <TabsTrigger value="attacks">{t.attackReports}</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="users" className="mt-6">
+                    <Card className="bg-slate-900/50 border-white/5">
+                      <ScrollArea className="h-[400px]">
+                        <div className="divide-y divide-white/5">
+                          {allUsers.map((u, i) => (
+                            <div key={i} className="p-4 flex items-center justify-between">
+                              <div>
+                                <div className="font-bold text-white">{u.name}</div>
+                                <div className="text-xs text-slate-500">{u.email}</div>
+                              </div>
+                              <Badge className={u.isPro ? 'bg-blue-500' : 'bg-slate-700'}>{u.isPro ? 'Pro' : 'Free'}</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </Card>
+                  </TabsContent>
+                  <TabsContent value="institutions">
+                    <Card className="bg-slate-900/50 border-white/5 p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <Input 
+                          placeholder="Institution Name" 
+                          value={newInstitution.name} 
+                          onChange={(e) => setNewInstitution({...newInstitution, name: e.target.value})}
+                          className="bg-black/40 border-white/10"
+                        />
+                        <Input 
+                          placeholder="Email" 
+                          value={newInstitution.email} 
+                          onChange={(e) => setNewInstitution({...newInstitution, email: e.target.value})}
+                          className="bg-black/40 border-white/10"
+                        />
+                        <Button onClick={addInstitution} className="bg-blue-600">Add Institution</Button>
+                      </div>
+                      <ScrollArea className="h-[300px]">
+                        <div className="divide-y divide-white/5">
+                          {institutions.map((inst, i) => (
+                            <div key={i} className="p-4 flex items-center justify-between">
+                              <div>
+                                <div className="font-bold text-white">{inst.name}</div>
+                                <div className="text-xs text-slate-500">{inst.email}</div>
+                              </div>
+                              <Badge variant="outline">Active</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </Card>
+                  </TabsContent>
+                  <TabsContent value="attacks">
+                    <Card className="bg-slate-900/50 border-white/5">
+                      <ScrollArea className="h-[400px]">
+                        <div className="divide-y divide-white/5">
+                          {allAttacks.filter(l => !l.result.isSafe).map((l, i) => (
+                            <div key={i} className="p-4">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="destructive" className="text-[10px]">{l.result.threatType}</Badge>
+                                <span className="text-[10px] text-slate-500">{new Date(l.timestamp).toLocaleString()}</span>
+                              </div>
+                              <p className="text-sm text-white">{l.content}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </Card>
+                  </TabsContent>
+                </Tabs>
+              </motion.div>
+            )}
           </>
         )}
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-white/5 py-12 mt-12 bg-black/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="col-span-1 md:col-span-2 space-y-4">
-              <div className="flex items-center gap-2">
-                <Shield className="text-blue-500 w-6 h-6" />
-                <span className="text-xl font-bold text-white">ShieldAI</span>
-              </div>
-              <p className="text-sm text-slate-500 max-w-xs">
-                Protecting millions of users from phishing, malware, and digital threats using state-of-the-art artificial intelligence.
-              </p>
-            </div>
-            <div>
-              <h5 className="text-sm font-bold text-white mb-4">Product</h5>
-              <ul className="space-y-2 text-sm text-slate-500">
-                <li><a href="#" className="hover:text-blue-400 transition-colors">Features</a></li>
-                <li><a href="#" className="hover:text-blue-400 transition-colors">Pricing</a></li>
-                <li><a href="#" className="hover:text-blue-400 transition-colors">Security</a></li>
-                <li><a href="#" className="hover:text-blue-400 transition-colors">API</a></li>
-              </ul>
-            </div>
-            <div>
-              <h5 className="text-sm font-bold text-white mb-4">Company</h5>
-              <ul className="space-y-2 text-sm text-slate-500">
-                <li><a href="#" className="hover:text-blue-400 transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-blue-400 transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-blue-400 transition-colors">Privacy</a></li>
-                <li><a href="#" className="hover:text-blue-400 transition-colors">Terms</a></li>
-              </ul>
-            </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Shield className="text-blue-500 w-6 h-6" />
+            <span className="text-xl font-bold text-white">ShieldAI</span>
           </div>
-          <Separator className="my-8 bg-white/5" />
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-600">
-            <p>© 2026 ShieldAI Security. All rights reserved.</p>
-            <div className="flex gap-6">
-              <a href="#" className="hover:text-slate-400 transition-colors">Twitter</a>
-              <a href="#" className="hover:text-slate-400 transition-colors">GitHub</a>
-              <a href="#" className="hover:text-slate-400 transition-colors">Discord</a>
-            </div>
-          </div>
+          <p className="text-sm text-slate-500 max-w-xs mx-auto mb-8">
+            Protecting millions of users from digital threats using state-of-the-art AI.
+          </p>
+          <div className="text-xs text-slate-600">© 2026 ShieldAI Security. All rights reserved.</div>
         </div>
       </footer>
     </div>

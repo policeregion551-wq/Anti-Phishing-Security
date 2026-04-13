@@ -58,11 +58,11 @@ async function startServer() {
       await transporter.sendMail({
         from: process.env.SMTP_FROM || process.env.SMTP_USER,
         to: email,
-        subject: "ShieldAI Security - Verification Code",
-        text: `Hello ${name || 'User'},\n\nYour verification code is: ${code}\n\nThis code will expire in 10 minutes.\n\nBest regards,\nShieldAI Security Team`,
+        subject: "BINI SHIELD AI Security - Verification Code",
+        text: `Hello ${name || 'User'},\n\nYour verification code is: ${code}\n\nThis code will expire in 10 minutes.\n\nBest regards,\nBINI SHIELD AI Security Team`,
         html: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-            <h2 style="color: #2563eb; margin-bottom: 16px;">ShieldAI Security</h2>
+            <h2 style="color: #2563eb; margin-bottom: 16px;">BINI SHIELD AI Security</h2>
             <p>Hello ${name || 'User'},</p>
             <p>Your verification code is:</p>
             <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; text-align: center; margin: 24px 0;">
@@ -103,7 +103,7 @@ async function startServer() {
 
     try {
       await twilioClient.messages.create({
-        body: `Your ShieldAI verification code is: ${code}. Valid for 10 minutes.`,
+        body: `Your BINI SHIELD AI verification code is: ${code}. Valid for 10 minutes.`,
         from: process.env.TWILIO_PHONE_NUMBER,
         to: phone
       });

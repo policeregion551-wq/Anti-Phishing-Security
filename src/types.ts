@@ -44,3 +44,34 @@ export interface DailyStats {
   scanned: number;
   threats: number;
 }
+
+export interface AuditResult {
+  id: string;
+  timestamp: string;
+  target: string; // URL or Folder Name
+  type: 'url' | 'code';
+  status: 'pass' | 'fail' | 'warning';
+  score: number;
+  findings: {
+    severity: 'critical' | 'high' | 'medium' | 'low';
+    issue: string;
+    fix: string;
+  }[];
+  certificateUrl?: string;
+}
+
+export interface SocialAccount {
+  id: string;
+  platform: 'telegram' | 'facebook' | 'whatsapp' | 'email' | 'instagram';
+  link: string;
+  status: 'monitoring' | 'protected' | 'alert';
+  lastAttack?: string;
+  attackCount: number;
+}
+
+export interface AdminStats {
+  totalUsers: number;
+  totalRevenue: number;
+  activeAudits: number;
+  blockedAttacks: number;
+}

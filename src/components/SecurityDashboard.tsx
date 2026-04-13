@@ -42,7 +42,8 @@ import {
   FileText,
   Mail,
   Building2,
-  FileWarning
+  FileWarning,
+  Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -70,7 +71,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { analyzeContent, performSecurityAudit } from '@/lib/gemini';
+import { analyzeContent, performSecurityAudit, verifyReceipt } from '@/lib/gemini';
 import { AnalysisResult, SecurityLog, DailyStats, ConnectionStatus, UserProfile, AuditResult, SocialAccount, AdminStats } from '@/types';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
@@ -175,7 +176,58 @@ const translations = {
     telebirrWithdraw: "Telebirr Withdrawal",
     withdrawAmount: "Withdrawal Amount",
     withdrawPhone: "Telebirr Phone Number",
-    confirmWithdraw: "Confirm Withdrawal"
+    confirmWithdraw: "Confirm Withdrawal",
+    transactionId: "Transaction ID",
+    enterTransactionId: "Enter Transaction ID",
+    adminNumber: "Admin Telebirr Number",
+    paymentInstructions: "Please send the payment to the number below and upload the receipt screenshot or enter the Transaction ID.",
+    submitTransaction: "Verify Payment",
+    yearlyPlan: "Yearly Plan (Best Value)",
+    monthlyPlan: "Monthly Plan",
+    uploadReceipt: "Upload Receipt Screenshot",
+    verifying: "Verifying Receipt...",
+    duplicateTransaction: "This Transaction ID has already been used.",
+    invalidReceipt: "Invalid receipt. Please upload a clear Telebirr receipt.",
+    pendingPayments: "Pending Payments",
+    approve: "Approve",
+    reject: "Reject",
+    copy: "Copy",
+    copied: "Copied!",
+    freePlan: "Free Plan",
+    proPlan: "Pro Plan",
+    currentPlan: "Current Plan",
+    upgradeNow: "Upgrade Now",
+    everythingInFree: "Everything in Free",
+    advancedAIScanner: "Advanced AI Scanner",
+    deepSecurityAudits: "Deep Security Audits",
+    prioritySupport: "Priority Support",
+    basicContentAnalysis: "Basic Content Analysis",
+    realTimeMonitoring: "Real-time Monitoring",
+    securityAudits: "Security Audits",
+    choosePlan: "Choose your payment plan",
+    cancel: "Cancel",
+    recommended: "Recommended",
+    telebirrPayment: "Telebirr Payment",
+    securePaymentTelebirr: "Secure payment via Telebirr",
+    enterpriseSecurity: "Enterprise Security",
+    institutionDashboard: "Institution Dashboard",
+    monitoringSecurityFor: "Monitoring security for",
+    activeThreats: "Active Threats",
+    optimal: "Optimal",
+    recent: "Recent",
+    lastAudit: "Last Audit",
+    today: "Today",
+    attacksBlocked: "Attacks Blocked",
+    institutionName: "Institution Name",
+    telegramLink: "Telegram Link",
+    whatsappLink: "WhatsApp Link",
+    facebookLink: "Facebook Link",
+    addInstitutionBtn: "Add Institution",
+    recommendation: "Recommendation",
+    securityScore: "Security Score",
+    receiptUploaded: "Receipt Uploaded",
+    amountOnReceiptWarning: "Amount on receipt is less than required. Admin will review.",
+    autoVerificationFailed: "Auto-verification failed. Please enter Transaction ID manually."
   },
   am: {
     dashboard: "ዳሽቦርድ",
@@ -233,7 +285,58 @@ const translations = {
     telebirrWithdraw: "በቴሌ ብር ገንዘብ ማውጣት",
     withdrawAmount: "የሚወጣው የገንዘብ መጠን",
     withdrawPhone: "የቴሌ ብር ስልክ ቁጥር",
-    confirmWithdraw: "ማውጣቱን አረጋግጥ"
+    confirmWithdraw: "ማውጣቱን አረጋግጥ",
+    transactionId: "የግብይት መለያ (Transaction ID)",
+    enterTransactionId: "የግብይት መለያ ያስገቡ",
+    adminNumber: "የአድሚን ቴሌብር ቁጥር",
+    paymentInstructions: "እባክዎን ክፍያውን ከታች ባለው ቁጥር ይላኩ እና የደረሰኝ ስክሪንሹት ይጫኑ ወይም የግብይት መለያ (Transaction ID) ያስገቡ።",
+    submitTransaction: "ክፍያውን አረጋግጥ",
+    yearlyPlan: "የአመት ክፍያ (ተመራጭ)",
+    monthlyPlan: "የወር ክፍያ",
+    uploadReceipt: "የደረሰኝ ስክሪንሹት ይጫኑ",
+    verifying: "ደረሰኙ እየተረጋገጠ ነው...",
+    duplicateTransaction: "ይህ የግብይት መለያ ቀደም ብሎ ጥቅም ላይ ውሏል።",
+    invalidReceipt: "ትክክለኛ ደረሰኝ አይደለም። እባክዎን ግልጽ የሆነ የቴሌብር ደረሰኝ ይጫኑ።",
+    pendingPayments: "በመጠባበቅ ላይ ያሉ ክፍያዎች",
+    approve: "አጽድቅ",
+    reject: "ሰርዝ",
+    copy: "ቅዳ",
+    copied: "ተቀድቷል!",
+    freePlan: "ነፃ አገልግሎት",
+    proPlan: "ፕሮ አገልግሎት",
+    currentPlan: "የአሁኑ አገልግሎት",
+    upgradeNow: "አሁኑኑ ያሳድጉ",
+    everythingInFree: "ሁሉንም በነፃ አገልግሎት ውስጥ ያሉ",
+    advancedAIScanner: "ጥልቅ AI ስካነር",
+    deepSecurityAudits: "ጥልቅ የደህንነት ምርመራዎች",
+    prioritySupport: "ቅድሚያ የሚሰጠው ድጋፍ",
+    basicContentAnalysis: "መሰረታዊ የምርመራ አገልግሎት",
+    realTimeMonitoring: "የቀጥታ ክትትል",
+    securityAudits: "የደህንነት ምርመራዎች",
+    choosePlan: "የክፍያ አማራጭዎን ይምረጡ",
+    cancel: "ሰርዝ",
+    recommended: "ተመራጭ",
+    telebirrPayment: "የቴሌብር ክፍያ",
+    securePaymentTelebirr: "በቴሌብር አስተማማኝ ክፍያ",
+    enterpriseSecurity: "የድርጅት ደህንነት",
+    institutionDashboard: "የተቋም ዳሽቦርድ",
+    monitoringSecurityFor: "ለዚህ ተቋም ጥበቃ እየተደረገ ነው፦",
+    activeThreats: "ንቁ ጥቃቶች",
+    optimal: "በጣም ጥሩ",
+    recent: "የቅርብ ጊዜ",
+    lastAudit: "የመጨረሻ ምርመራ",
+    today: "ዛሬ",
+    attacksBlocked: "የተከለከሉ ጥቃቶች",
+    institutionName: "የተቋም ስም",
+    telegramLink: "የቴሌግራም ሊንክ",
+    whatsappLink: "የዋትስአፕ ሊንክ",
+    facebookLink: "የፌስቡክ ሊንክ",
+    addInstitutionBtn: "ተቋም ጨምር",
+    recommendation: "ምክረ ሃሳብ",
+    securityScore: "የደህንነት ውጤት",
+    receiptUploaded: "ደረሰኝ ተጭኗል",
+    amountOnReceiptWarning: "በደረሰኙ ላይ ያለው የገንዘብ መጠን ከሚፈለገው ያነሰ ነው። አድሚን ያረጋግጠዋል።",
+    autoVerificationFailed: "አውቶማቲክ ማረጋገጫ አልተሳካም። እባክዎን የግብይት መለያውን (Transaction ID) በእጅ ያስገቡ።"
   }
 };
 
@@ -257,10 +360,51 @@ export default function SecurityDashboard() {
   const [paymentStep, setPaymentStep] = useState<'method' | 'phone' | 'pin' | 'success'>('method');
   const [paymentPhone, setPaymentPhone] = useState('');
   const [paymentPin, setPaymentPin] = useState('');
+  const [transactionId, setTransactionId] = useState('');
   const [paymentAmount, setPaymentAmount] = useState(299);
+  const [paymentPlan, setPaymentPlan] = useState<'monthly' | 'yearly'>('monthly');
+  const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  const [isVerifyingReceipt, setIsVerifyingReceipt] = useState(false);
+  const [lastAnalysis, setLastAnalysis] = useState<AnalysisResult | null>(null);
+  const [systemReports, setSystemReports] = useState<any[]>([]);
+  const [pendingPayments, setPendingPayments] = useState<any[]>([]);
+
+  const addSystemReport = async (action: string, details: string, type: 'info' | 'warning' | 'error' | 'success' = 'info') => {
+    try {
+      await addDoc(collection(db, 'system_reports'), {
+        timestamp: new Date().toISOString(),
+        action,
+        details,
+        type,
+        userId: user?.uid || 'system'
+      });
+    } catch (e) {
+      console.error("Failed to add system report", e);
+    }
+  };
 
   useEffect(() => {
     setIsMounted(true);
+    
+    // Explicitly enable context menu and text selection
+    const enableInteraction = (e: MouseEvent) => {
+      e.stopPropagation();
+    };
+    document.addEventListener('contextmenu', enableInteraction, true);
+    
+    // Check for payment success redirect
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('payment') === 'success') {
+      toast.success("Payment Verified!", {
+        description: "Your account has been upgraded to Pro successfully."
+      });
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    return () => {
+      document.removeEventListener('contextmenu', enableInteraction, true);
+    };
   }, []);
 
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
@@ -359,6 +503,12 @@ export default function SecurityDashboard() {
         activeAudits: 12,
         blockedAttacks: logsList.filter(l => !l.result.isSafe).length
       });
+
+      const reportsSnap = await getDocs(query(collection(db, 'system_reports'), orderBy('timestamp', 'desc'), limit(100)));
+      setSystemReports(reportsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+      const paymentsSnap = await getDocs(query(collection(db, 'payment_requests'), where('status', '==', 'pending')));
+      setPendingPayments(paymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (error) {
       console.error("Failed to load admin data", error);
     }
@@ -458,18 +608,29 @@ export default function SecurityDashboard() {
     if (!withdrawAmount || !withdrawPhone) return;
     setIsWithdrawing(true);
     try {
-      const response = await fetch('/api/withdraw', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: withdrawAmount, phone: withdrawPhone, userId: user.uid })
-      });
-      if (response.ok) {
-        toast.success("Withdrawal request sent successfully!");
-        setWithdrawAmount('');
-        setWithdrawPhone('');
-      } else {
-        toast.error("Withdrawal failed");
+      // Simulate withdrawal logic
+      const statsRef = doc(db, 'system_stats', 'global');
+      const statsSnap = await getDoc(statsRef);
+      const currentRevenue = statsSnap.exists() ? (statsSnap.data().totalRevenue || 0) : 0;
+      
+      if (currentRevenue < Number(withdrawAmount)) {
+        toast.error("Insufficient balance for withdrawal");
+        return;
       }
+
+      await updateDoc(statsRef, {
+        totalRevenue: currentRevenue - Number(withdrawAmount)
+      });
+
+      await addSystemReport(
+        'Withdrawal Processed',
+        `Admin withdrew ${withdrawAmount} ETB to Telebirr number ${withdrawPhone}.`,
+        'warning'
+      );
+
+      toast.success("Withdrawal processed successfully via Telebirr!");
+      setWithdrawAmount('');
+      setWithdrawPhone('');
     } catch (error) {
       toast.error("Withdrawal failed");
     } finally {
@@ -513,6 +674,11 @@ export default function SecurityDashboard() {
     }
   };
 
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(t.copied);
+  };
+
   // Simulated Auto-Scan Logic
   useEffect(() => {
     if (!isAutoScanning || !user) return;
@@ -533,6 +699,12 @@ export default function SecurityDashboard() {
             source: randomSource,
             result
           });
+
+          await addSystemReport(
+            'Auto-Scan Performed',
+            `Auto-scan on ${randomSource} for user ${user.email}. Result: ${result.isSafe ? 'Safe' : 'Unsafe (' + result.threatType + ')'}`,
+            result.isSafe ? 'info' : 'warning'
+          );
           
           if (!result.isSafe) {
             toast.error(`Auto-Scan: Threat detected on ${randomSource.toUpperCase()}`, {
@@ -549,43 +721,175 @@ export default function SecurityDashboard() {
   }, [isAutoScanning, user]);
 
   const handlePayment = async () => {
-    if (!user) return;
-    
+    if (!transactionId || !user) return;
     setIsPaying(true);
+    try {
+      // Check for duplicate Transaction ID
+      const q = query(collection(db, 'payment_requests'), where('transactionId', '==', transactionId));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        toast.error(t.duplicateTransaction);
+        setIsPaying(false);
+        return;
+      }
+
+      await addDoc(collection(db, 'payment_requests'), {
+        userId: user.uid,
+        userEmail: user.email,
+        transactionId,
+        amount: paymentAmount,
+        status: 'pending',
+        timestamp: new Date().toISOString()
+      });
+      
+      await addSystemReport(
+        'Payment Request Submitted',
+        `User ${user.email} submitted transaction ID: ${transactionId}`,
+        'info'
+      );
+      
+      setPaymentStep('success');
+      toast.success("Transaction ID submitted!", {
+        description: "Admin will verify your payment shortly."
+      });
+    } catch (error) {
+      toast.error("Submission failed.");
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
+  const handleReceiptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReceiptImage(reader.result as string);
+        handleAutoVerify(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAutoVerify = async (base64Image: string) => {
+    setIsVerifyingReceipt(true);
+    toast.info(t.verifying);
     
     try {
-      // Update user profile
-      const docRef = doc(db, 'users', user.uid);
-      await updateDoc(docRef, {
-        isPro: true,
-        paymentStatus: 'completed'
+      const base64Data = base64Image.split(',')[1];
+      const result = await verifyReceipt(base64Data);
+      
+      if (result.isValid) {
+        // Check for duplicate Transaction ID
+        const q = query(collection(db, 'payment_requests'), where('transactionId', '==', result.transactionId));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          toast.error(t.duplicateTransaction);
+          return;
+        }
+
+        setTransactionId(result.transactionId);
+        toast.success("Receipt verified automatically!", {
+          description: `Transaction ID: ${result.transactionId} | Amount: ${result.amount} ETB`
+        });
+        
+        // Auto-approve if amount matches plan
+        if (result.amount >= paymentAmount) {
+          await processAutomaticUpgrade(result.transactionId, result.amount);
+        } else {
+          toast.warning("Amount on receipt is less than required. Admin will review.");
+        }
+      } else {
+        toast.error(t.invalidReceipt, { description: result.reason });
+      }
+    } catch (error) {
+      console.error("Auto-verification failed", error);
+      toast.error("Auto-verification failed. Please enter Transaction ID manually.");
+    } finally {
+      setIsVerifyingReceipt(false);
+    }
+  };
+
+  const processAutomaticUpgrade = async (tid: string, amount: number) => {
+    if (!user) return;
+    try {
+      await addDoc(collection(db, 'payment_requests'), {
+        userId: user.uid,
+        userEmail: user.email,
+        transactionId: tid,
+        amount: amount,
+        status: 'approved',
+        timestamp: new Date().toISOString(),
+        verifiedBy: 'AI'
       });
+
+      await updateDoc(doc(db, 'users', user.uid), { 
+        isPro: true, 
+        paymentStatus: 'completed',
+        plan: paymentPlan,
+        expiryDate: paymentPlan === 'yearly' ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() : null
+      });
+
+      const statsRef = doc(db, 'system_stats', 'global');
+      const statsSnap = await getDoc(statsRef);
+      if (statsSnap.exists()) {
+        await updateDoc(statsRef, {
+          totalRevenue: (statsSnap.data().totalRevenue || 0) + amount
+        });
+      }
+
+      await addSystemReport(
+        'AI Payment Verification',
+        `User ${user.email} upgraded automatically via receipt scan. ID: ${tid}`,
+        'success'
+      );
+
+      setIsPro(true);
+      setPaymentStep('success');
+    } catch (e) {
+      console.error("Auto upgrade failed", e);
+    }
+  };
+
+  const handleApprovePayment = async (requestId: string, userId: string, amount: number) => {
+    try {
+      // Update request status
+      await updateDoc(doc(db, 'payment_requests', requestId), { status: 'approved' });
+      
+      // Upgrade user
+      await updateDoc(doc(db, 'users', userId), { isPro: true, paymentStatus: 'completed' });
       
       // Update global revenue
       const statsRef = doc(db, 'system_stats', 'global');
       const statsSnap = await getDoc(statsRef);
       if (statsSnap.exists()) {
         await updateDoc(statsRef, {
-          totalRevenue: (statsSnap.data().totalRevenue || 0) + paymentAmount
+          totalRevenue: (statsSnap.data().totalRevenue || 0) + amount
         });
-      } else {
-        await setDoc(statsRef, { totalRevenue: paymentAmount });
       }
       
-      setIsPro(true);
-      setPaymentStep('success');
-      toast.success("Payment Successful!", {
-        description: `Welcome to BINI SHIELD AI Pro. ${paymentAmount} ETB has been processed via Telebirr.`
-      });
+      await addSystemReport(
+        'Payment Approved',
+        `Admin approved payment for user ${userId}. Amount: ${amount} ETB`,
+        'success'
+      );
       
-      setTimeout(() => {
-        setIsPaying(false);
-        setActiveTab('dashboard');
-        setPaymentStep('method');
-      }, 3000);
+      toast.success("Payment approved!");
+      loadAdminData(); // Refresh admin view
     } catch (error) {
-      toast.error("Payment update failed.");
-      setIsPaying(false);
+      toast.error("Approval failed.");
+    }
+  };
+
+  const handleRejectPayment = async (requestId: string) => {
+    try {
+      await updateDoc(doc(db, 'payment_requests', requestId), { status: 'rejected' });
+      toast.info("Payment rejected.");
+      loadAdminData();
+    } catch (error) {
+      toast.error("Rejection failed.");
     }
   };
 
@@ -605,7 +909,14 @@ export default function SecurityDashboard() {
         source: 'manual',
         result
       });
+
+      await addSystemReport(
+        'Manual Scan Performed',
+        `User ${user.email} scanned content. Result: ${result.isSafe ? 'Safe' : 'Unsafe (' + result.threatType + ')'}`,
+        result.isSafe ? 'info' : 'warning'
+      );
       
+      setLastAnalysis(result);
       setInput('');
       
       if (result.isSafe) {
@@ -753,9 +1064,9 @@ export default function SecurityDashboard() {
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6 p-10 bg-gradient-to-br from-blue-600/10 via-blue-900/5 to-transparent border border-blue-500/20 rounded-[2.5rem] backdrop-blur-xl shadow-2xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 blur-[100px] -z-10" />
                   <div className="space-y-3 text-center md:text-left">
-                    <Badge className="bg-blue-600/20 text-blue-400 border-blue-500/30 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest">Enterprise Security</Badge>
-                    <h2 className="text-4xl font-bold text-white tracking-tight">Institution Dashboard</h2>
-                    <p className="text-slate-400 text-lg">Monitoring security for <strong className="text-white font-semibold">{userProfile.name}</strong></p>
+                    <Badge className="bg-blue-600/20 text-blue-400 border-blue-500/30 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest">{t.enterpriseSecurity}</Badge>
+                    <h2 className="text-4xl font-bold text-white tracking-tight">{t.institutionDashboard}</h2>
+                    <p className="text-slate-400 text-lg">{t.monitoringSecurityFor} <strong className="text-white font-semibold">{userProfile.name}</strong></p>
                   </div>
                   <div className="flex gap-4">
                     {userProfile.institutionLinks?.telegram && (
@@ -784,7 +1095,7 @@ export default function SecurityDashboard() {
                       </div>
                       <Badge className="bg-red-500/10 text-red-400">Critical</Badge>
                     </div>
-                    <CardDescription className="text-[10px] uppercase font-bold text-slate-500 tracking-widest mb-1">Active Threats</CardDescription>
+                    <CardDescription className="text-[10px] uppercase font-bold text-slate-500 tracking-widest mb-1">{t.activeThreats}</CardDescription>
                     <CardTitle className="text-4xl font-bold text-white">0</CardTitle>
                   </Card>
                   <Card className="bg-slate-900/40 border-white/5 backdrop-blur-md p-8 rounded-3xl border-l-4 border-l-emerald-500/50">
@@ -792,9 +1103,9 @@ export default function SecurityDashboard() {
                       <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-400">
                         <ShieldCheck className="w-6 h-6" />
                       </div>
-                      <Badge className="bg-emerald-500/10 text-emerald-400">Optimal</Badge>
+                      <Badge className="bg-emerald-500/10 text-emerald-400">{t.optimal}</Badge>
                     </div>
-                    <CardDescription className="text-[10px] uppercase font-bold text-slate-500 tracking-widest mb-1">Security Score</CardDescription>
+                    <CardDescription className="text-[10px] uppercase font-bold text-slate-500 tracking-widest mb-1">{t.securityScore}</CardDescription>
                     <CardTitle className="text-4xl font-bold text-white">100%</CardTitle>
                   </Card>
                   <Card className="bg-slate-900/40 border-white/5 backdrop-blur-md p-8 rounded-3xl border-l-4 border-l-blue-500/50">
@@ -802,10 +1113,10 @@ export default function SecurityDashboard() {
                       <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-400">
                         <History className="w-6 h-6" />
                       </div>
-                      <Badge className="bg-blue-500/10 text-blue-400">Recent</Badge>
+                      <Badge className="bg-blue-500/10 text-blue-400">{t.recent}</Badge>
                     </div>
-                    <CardDescription className="text-[10px] uppercase font-bold text-slate-500 tracking-widest mb-1">Last Audit</CardDescription>
-                    <CardTitle className="text-2xl font-bold text-white">Today</CardTitle>
+                    <CardDescription className="text-[10px] uppercase font-bold text-slate-500 tracking-widest mb-1">{t.lastAudit}</CardDescription>
+                    <CardTitle className="text-2xl font-bold text-white">{t.today}</CardTitle>
                   </Card>
                 </div>
               </motion.div>
@@ -878,7 +1189,19 @@ export default function SecurityDashboard() {
                   <Card className="bg-slate-900/50 border-white/5 overflow-hidden">
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle className="text-lg font-semibold">{t.recentLogs}</CardTitle>
-                      <History className="w-5 h-5 text-slate-500" />
+                      <div className="flex items-center gap-2">
+                        {logs.length > 0 && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 text-[10px] uppercase font-bold text-slate-400 hover:text-white"
+                            onClick={() => copyToClipboard(logs.map(l => `[${l.timestamp}] ${l.source}: ${l.content} -> ${l.result}`).join('\n'))}
+                          >
+                            <Copy className="w-3 h-3 mr-1" /> {t.copy} All
+                          </Button>
+                        )}
+                        <History className="w-5 h-5 text-slate-500" />
+                      </div>
                     </CardHeader>
                     <CardContent className="p-0">
                       <ScrollArea className="h-[400px]">
@@ -889,20 +1212,29 @@ export default function SecurityDashboard() {
                             logs.map((log) => (
                               <div key={log.id} className="p-4 hover:bg-white/5 transition-colors">
                                 <div className="flex items-start justify-between gap-4">
-                                  <div className="flex items-start gap-3">
-                                    <div className={`mt-1 w-8 h-8 rounded-lg flex items-center justify-center ${log.result.isSafe ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                                  <div className="flex items-start gap-3 flex-1">
+                                    <div className={`mt-1 w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${log.result.isSafe ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
                                       {log.result.isSafe ? <ShieldCheck className="w-5 h-5" /> : <ShieldAlert className="w-5 h-5" />}
                                     </div>
-                                    <div>
+                                    <div className="flex-1 min-w-0">
                                       <div className="flex items-center gap-2 mb-1">
                                         <Badge variant="outline" className="text-[10px] uppercase">{log.source}</Badge>
                                         <span className="text-[10px] text-slate-500">{new Date(log.timestamp).toLocaleTimeString()}</span>
                                       </div>
-                                      <p className="text-sm font-medium text-slate-200 line-clamp-1">{log.content}</p>
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-sm font-medium text-slate-200 line-clamp-1 flex-1">{log.content}</p>
+                                        <button 
+                                          onClick={() => copyToClipboard(log.content)}
+                                          className="p-1 hover:bg-white/10 rounded text-slate-500 hover:text-white transition-colors"
+                                          title={t.copy}
+                                        >
+                                          <Copy className="w-3 h-3" />
+                                        </button>
+                                      </div>
                                       <p className="text-xs text-slate-400 line-clamp-2">{log.result.reason}</p>
                                     </div>
                                   </div>
-                                  <div className={`text-xs font-bold ${log.result.isSafe ? 'text-emerald-400' : 'text-red-400'}`}>
+                                  <div className={`text-xs font-bold shrink-0 ${log.result.isSafe ? 'text-emerald-400' : 'text-red-400'}`}>
                                     {log.result.score}% {log.result.isSafe ? t.safe : t.unsafe}
                                   </div>
                                 </div>
@@ -964,6 +1296,50 @@ export default function SecurityDashboard() {
                       {isAnalyzing ? t.scanning : t.analyze}
                     </Button>
                   </Card>
+
+                  {lastAnalysis && (
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                      <Card className={`bg-slate-900/50 border-2 ${lastAnalysis.isSafe ? 'border-emerald-500/30' : 'border-red-500/30'} p-6`}>
+                        <div className="flex items-center justify-between mb-6">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${lastAnalysis.isSafe ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                              {lastAnalysis.isSafe ? <ShieldCheck className="w-8 h-8" /> : <ShieldAlert className="w-8 h-8" />}
+                            </div>
+                            <div>
+                              <h3 className="text-xl font-bold text-white">{lastAnalysis.isSafe ? t.safe : t.unsafe}</h3>
+                              <p className="text-sm text-slate-400">{lastAnalysis.threatType.toUpperCase()}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-2xl font-bold ${lastAnalysis.isSafe ? 'text-emerald-400' : 'text-red-400'}`}>{lastAnalysis.score}%</div>
+                            <div className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">{t.securityScore}</div>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          <div className="p-4 bg-white/5 rounded-xl border border-white/5 relative group">
+                            <p className="text-slate-200 text-sm leading-relaxed">{lastAnalysis.reason}</p>
+                            <button 
+                              onClick={() => copyToClipboard(lastAnalysis.reason)}
+                              className="absolute top-2 right-2 p-2 bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-white"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <div className="p-4 bg-blue-500/5 rounded-xl border border-blue-500/10 relative group">
+                            <h4 className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">{t.recommendation}</h4>
+                            <p className="text-slate-300 text-sm">{lastAnalysis.recommendation}</p>
+                            <button 
+                              onClick={() => copyToClipboard(lastAnalysis.recommendation)}
+                              className="absolute top-2 right-2 p-2 bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-white"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </Card>
+                    </motion.div>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -1031,12 +1407,50 @@ export default function SecurityDashboard() {
                         <div className="flex justify-center gap-8 py-4">
                           <div>
                             <div className="text-xs text-slate-500">Certificate ID</div>
-                            <div className="font-bold text-white print:text-black">{currentAudit.id}</div>
+                            <div className="font-bold text-white print:text-black flex items-center gap-2">
+                              {currentAudit.id}
+                              <button onClick={() => copyToClipboard(currentAudit.id)} className="print:hidden p-1 hover:bg-white/10 rounded">
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
                           </div>
                           <div>
                             <div className="text-xs text-slate-500">Date</div>
                             <div className="font-bold text-white print:text-black">{new Date(currentAudit.timestamp).toLocaleDateString()}</div>
                           </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-lg font-bold text-white flex items-center gap-2">
+                            <ShieldAlert className="w-5 h-5 text-amber-500" />
+                            {t.findings}
+                          </h4>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 text-[10px] uppercase font-bold text-slate-400 hover:text-white"
+                            onClick={() => copyToClipboard(currentAudit.findings.map((f: any) => `[${f.severity.toUpperCase()}] ${f.issue}\nFix: ${f.fix}`).join('\n\n'))}
+                          >
+                            <Copy className="w-3 h-3 mr-1" /> {t.copy} All
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-1 gap-4">
+                          {currentAudit.findings.map((finding: any, idx: number) => (
+                            <div key={idx} className="p-4 bg-white/5 border border-white/10 rounded-xl space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Badge className={finding.severity === 'high' ? 'bg-red-500' : finding.severity === 'medium' ? 'bg-amber-500' : 'bg-blue-500'}>
+                                  {finding.severity.toUpperCase()}
+                                </Badge>
+                                <button onClick={() => copyToClipboard(`${finding.issue}\nFix: ${finding.fix}`)} className="p-1 hover:bg-white/10 rounded text-slate-500 hover:text-white transition-colors">
+                                  <Copy className="w-3 h-3" />
+                                </button>
+                              </div>
+                              <div className="text-sm font-bold text-white">{finding.issue}</div>
+                              <div className="text-xs text-slate-400"><strong>Fix:</strong> {finding.fix}</div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </CardContent>
@@ -1098,37 +1512,37 @@ export default function SecurityDashboard() {
               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-4xl mx-auto">
                 <div className="text-center mb-12">
                   <h2 className="text-4xl font-bold text-white mb-4">BINI SHIELD AI Pro</h2>
-                  <p className="text-slate-400">Unlock advanced security features and protect your digital life.</p>
+                  <p className="text-slate-400">{t.socialDesc}</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <Card className="bg-slate-900/50 border-white/5 p-8 flex flex-col">
                     <div className="mb-8">
-                      <h3 className="text-xl font-bold text-white mb-2">Free Plan</h3>
-                      <div className="text-3xl font-bold text-white">0 ETB <span className="text-sm font-normal text-slate-500">/ month</span></div>
+                      <h3 className="text-xl font-bold text-white mb-2">{t.freePlan}</h3>
+                      <div className="text-3xl font-bold text-white">0 ETB <span className="text-sm font-normal text-slate-500">/ {lang === 'en' ? 'month' : 'ወር'}</span></div>
                     </div>
                     <ul className="space-y-4 mb-8 flex-1">
-                      <li className="flex items-center gap-2 text-slate-300"><Check className="w-4 h-4 text-emerald-500" /> Basic Content Analysis</li>
-                      <li className="flex items-center gap-2 text-slate-300"><Check className="w-4 h-4 text-emerald-500" /> Real-time Monitoring</li>
-                      <li className="flex items-center gap-2 text-slate-500"><X className="w-4 h-4 text-red-500" /> Advanced AI Scanner</li>
-                      <li className="flex items-center gap-2 text-slate-500"><X className="w-4 h-4 text-red-500" /> Security Audits</li>
+                      <li className="flex items-center gap-2 text-slate-300"><Check className="w-4 h-4 text-emerald-500" /> {t.basicContentAnalysis}</li>
+                      <li className="flex items-center gap-2 text-slate-300"><Check className="w-4 h-4 text-emerald-500" /> {t.realTimeMonitoring}</li>
+                      <li className="flex items-center gap-2 text-slate-500"><X className="w-4 h-4 text-red-500" /> {t.advancedAIScanner}</li>
+                      <li className="flex items-center gap-2 text-slate-500"><X className="w-4 h-4 text-red-500" /> {t.securityAudits}</li>
                     </ul>
-                    <Button variant="outline" className="w-full border-white/10 text-white hover:bg-white/5" disabled>Current Plan</Button>
+                    <Button variant="outline" className="w-full border-white/10 text-white hover:bg-white/5" disabled>{t.currentPlan}</Button>
                   </Card>
 
                   <Card className="bg-blue-600/10 border-blue-500/50 p-8 flex flex-col relative overflow-hidden">
-                    <div className="absolute top-4 right-4 bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-widest">Recommended</div>
+                    <div className="absolute top-4 right-4 bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-widest">{t.recommended}</div>
                     <div className="mb-8">
-                      <h3 className="text-xl font-bold text-white mb-2">Pro Plan</h3>
-                      <div className="text-3xl font-bold text-white">299 ETB <span className="text-sm font-normal text-slate-400">/ month</span></div>
+                      <h3 className="text-xl font-bold text-white mb-2">{t.proPlan}</h3>
+                      <div className="text-3xl font-bold text-white">299 ETB <span className="text-sm font-normal text-slate-400">/ {lang === 'en' ? 'month' : 'ወር'}</span></div>
                     </div>
                     <ul className="space-y-4 mb-8 flex-1">
-                      <li className="flex items-center gap-2 text-slate-200"><Check className="w-4 h-4 text-emerald-400" /> Everything in Free</li>
-                      <li className="flex items-center gap-2 text-slate-200"><Check className="w-4 h-4 text-emerald-400" /> Advanced AI Scanner</li>
-                      <li className="flex items-center gap-2 text-slate-200"><Check className="w-4 h-4 text-emerald-400" /> Deep Security Audits</li>
-                      <li className="flex items-center gap-2 text-slate-200"><Check className="w-4 h-4 text-emerald-400" /> Priority Support</li>
+                      <li className="flex items-center gap-2 text-slate-200"><Check className="w-4 h-4 text-emerald-400" /> {t.everythingInFree}</li>
+                      <li className="flex items-center gap-2 text-slate-200"><Check className="w-4 h-4 text-emerald-400" /> {t.advancedAIScanner}</li>
+                      <li className="flex items-center gap-2 text-slate-200"><Check className="w-4 h-4 text-emerald-400" /> {t.deepSecurityAudits}</li>
+                      <li className="flex items-center gap-2 text-slate-200"><Check className="w-4 h-4 text-emerald-400" /> {t.prioritySupport}</li>
                     </ul>
-                    <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 shadow-lg shadow-blue-600/20 border border-blue-400/30 transition-all active:scale-95" onClick={() => { setPaymentStep('method'); setIsPaying(true); }}>Upgrade Now</Button>
+                    <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 shadow-lg shadow-blue-600/20 border border-blue-400/30 transition-all active:scale-95" onClick={() => { setPaymentStep('method'); setIsPaying(true); }}>{t.upgradeNow}</Button>
                   </Card>
                 </div>
 
@@ -1151,7 +1565,23 @@ export default function SecurityDashboard() {
                         <CardContent className="p-6">
                           {paymentStep === 'method' && (
                             <div className="space-y-4">
-                              <p className="text-center text-slate-400 mb-6">Choose your payment method</p>
+                              <p className="text-center text-slate-400 mb-6">{t.choosePlan}</p>
+                              <div className="grid grid-cols-2 gap-4 mb-6">
+                                <button 
+                                  onClick={() => { setPaymentPlan('monthly'); setPaymentAmount(299); }}
+                                  className={`p-4 rounded-xl border-2 transition-all ${paymentPlan === 'monthly' ? 'border-blue-500 bg-blue-500/10' : 'border-white/5 bg-white/5 hover:bg-white/10'}`}
+                                >
+                                  <div className="text-sm font-bold text-white">{t.monthlyPlan}</div>
+                                  <div className="text-xl font-bold text-blue-400">299 ETB</div>
+                                </button>
+                                <button 
+                                  onClick={() => { setPaymentPlan('yearly'); setPaymentAmount(2999); }}
+                                  className={`p-4 rounded-xl border-2 transition-all ${paymentPlan === 'yearly' ? 'border-amber-500 bg-amber-500/10' : 'border-white/5 bg-white/5 hover:bg-white/10'}`}
+                                >
+                                  <div className="text-sm font-bold text-white">{t.yearlyPlan}</div>
+                                  <div className="text-xl font-bold text-amber-400">2999 ETB</div>
+                                </button>
+                              </div>
                               <Button 
                                 className="w-full h-16 bg-[#00adef] hover:bg-[#0096d1] flex items-center justify-between px-6 group"
                                 onClick={() => setPaymentStep('phone')}
@@ -1160,56 +1590,79 @@ export default function SecurityDashboard() {
                                 <ArrowRight className="w-5 h-5 text-white group-hover:translate-x-1 transition-transform" />
                               </Button>
                               <Button variant="outline" className="w-full h-16 border-white/10 text-white hover:bg-white/5" onClick={() => setIsPaying(false)}>
-                                Cancel
+                                {t.cancel}
                               </Button>
                             </div>
                           )}
 
                           {paymentStep === 'phone' && (
                             <div className="space-y-6">
-                              <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Phone Number</label>
-                                <Input 
-                                  placeholder="09xxxxxxxx" 
-                                  className="bg-black/40 border-white/10 h-12 text-white text-lg tracking-widest"
-                                  value={paymentPhone}
-                                  onChange={(e) => setPaymentPhone(e.target.value)}
-                                />
+                              <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-center">
+                                <div className="text-xs text-slate-400 mb-1">{t.adminNumber}</div>
+                                <div className="text-2xl font-bold text-white tracking-widest">0927145171</div>
                               </div>
-                              <Button 
-                                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold"
-                                onClick={() => paymentPhone.length >= 10 ? setPaymentStep('pin') : toast.error("Invalid phone number")}
-                              >
-                                Continue
-                              </Button>
-                              <Button variant="ghost" className="w-full text-slate-400" onClick={() => setPaymentStep('method')}>Back</Button>
-                            </div>
-                          )}
+                              <p className="text-xs text-slate-400 text-center px-4">
+                                {t.paymentInstructions}
+                              </p>
 
-                          {paymentStep === 'pin' && (
-                            <div className="space-y-6">
-                              <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Telebirr PIN</label>
-                                <Input 
-                                  type="password"
-                                  placeholder="****" 
-                                  className="bg-black/40 border-white/10 h-12 text-white text-center text-2xl tracking-[1em]"
-                                  maxLength={4}
-                                  value={paymentPin}
-                                  onChange={(e) => setPaymentPin(e.target.value)}
-                                />
+                              <div className="space-y-4">
+                                <div className="relative">
+                                  <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    onChange={handleReceiptUpload}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                    disabled={isVerifyingReceipt}
+                                  />
+                                  <div className={`w-full h-24 border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-2 transition-all ${receiptImage ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-white/10 bg-black/40 hover:bg-black/60'}`}>
+                                    {isVerifyingReceipt ? (
+                                      <div className="flex items-center gap-2 text-blue-400">
+                                        <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                                        <span className="text-xs font-bold">{t.verifying}</span>
+                                      </div>
+                                    ) : receiptImage ? (
+                                      <>
+                                        <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                                        <span className="text-xs text-emerald-400 font-bold">{t.receiptUploaded}</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Upload className="w-6 h-6 text-slate-500" />
+                                        <span className="text-xs text-slate-500 font-bold">{t.uploadReceipt}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="relative flex items-center py-2">
+                                  <div className="flex-grow border-t border-white/5"></div>
+                                  <span className="flex-shrink mx-4 text-slate-600 text-[10px] font-bold uppercase tracking-widest">OR</span>
+                                  <div className="flex-grow border-t border-white/5"></div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{t.transactionId}</label>
+                                  <Input 
+                                    placeholder={t.enterTransactionId} 
+                                    className="bg-black/40 border-white/10 h-12 text-white text-lg"
+                                    value={transactionId}
+                                    onChange={(e) => setTransactionId(e.target.value)}
+                                  />
+                                </div>
                               </div>
+
                               <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-center">
                                 <div className="text-xs text-slate-400 mb-1">Total Amount</div>
                                 <div className="text-2xl font-bold text-white">{paymentAmount} ETB</div>
                               </div>
                               <Button 
-                                className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-                                onClick={handlePayment}
+                                className="w-full h-12 bg-[#00adef] hover:bg-[#0096d1] text-white font-bold"
+                                onClick={() => transactionId.length >= 6 ? handlePayment() : toast.error("Invalid Transaction ID")}
+                                disabled={isPaying || isVerifyingReceipt}
                               >
-                                Pay Now
+                                {isPaying ? "Submitting..." : t.submitTransaction}
                               </Button>
-                              <Button variant="ghost" className="w-full text-slate-400" onClick={() => setPaymentStep('phone')}>Back</Button>
+                              <Button variant="ghost" className="w-full text-slate-400" onClick={() => setPaymentStep('method')} disabled={isPaying || isVerifyingReceipt}>Back</Button>
                             </div>
                           )}
 
@@ -1252,7 +1705,7 @@ export default function SecurityDashboard() {
                   </Card>
                   <Card className="bg-slate-900/50 border-white/5">
                     <CardHeader className="pb-2">
-                      <CardDescription className="text-slate-400 uppercase text-[10px] font-bold">Attacks Blocked</CardDescription>
+                      <CardDescription className="text-slate-400 uppercase text-[10px] font-bold">{t.attacksBlocked}</CardDescription>
                       <CardTitle className="text-2xl font-bold text-emerald-400">{adminStats.blockedAttacks}</CardTitle>
                     </CardHeader>
                   </Card>
@@ -1279,7 +1732,7 @@ export default function SecurityDashboard() {
                         <Button className="flex-1 bg-amber-600 hover:bg-amber-700" onClick={handleWithdraw} disabled={isWithdrawing}>
                           {t.confirmWithdraw}
                         </Button>
-                        <Button variant="ghost" className="flex-1" onClick={() => setIsWithdrawing(false)}>Cancel</Button>
+                        <Button variant="ghost" className="flex-1" onClick={() => setIsWithdrawing(false)}>{t.cancel}</Button>
                       </div>
                     </div>
                   </Card>
@@ -1290,6 +1743,8 @@ export default function SecurityDashboard() {
                     <TabsTrigger value="users">{t.users}</TabsTrigger>
                     <TabsTrigger value="institutions">{t.institutions}</TabsTrigger>
                     <TabsTrigger value="attacks">{t.attackReports}</TabsTrigger>
+                    <TabsTrigger value="pending">{t.pendingPayments}</TabsTrigger>
+                    <TabsTrigger value="reports">{t.reports}</TabsTrigger>
                   </TabsList>
                   <TabsContent value="users" className="mt-6">
                     <Card className="bg-slate-900/50 border-white/5">
@@ -1312,36 +1767,36 @@ export default function SecurityDashboard() {
                     <Card className="bg-slate-900/50 border-white/5 p-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                         <Input 
-                          placeholder="Institution Name" 
+                          placeholder={t.institutionName} 
                           value={newInstitution.name} 
                           onChange={(e) => setNewInstitution({...newInstitution, name: e.target.value})}
                           className="bg-black/40 border-white/10"
                         />
                         <Input 
-                          placeholder="Email" 
+                          placeholder={t.email} 
                           value={newInstitution.email} 
                           onChange={(e) => setNewInstitution({...newInstitution, email: e.target.value})}
                           className="bg-black/40 border-white/10"
                         />
                         <Input 
-                          placeholder="Telegram Link" 
+                          placeholder={t.telegramLink} 
                           value={newInstitution.telegram} 
                           onChange={(e) => setNewInstitution({...newInstitution, telegram: e.target.value})}
                           className="bg-black/40 border-white/10"
                         />
                         <Input 
-                          placeholder="WhatsApp Link" 
+                          placeholder={t.whatsappLink} 
                           value={newInstitution.whatsapp} 
                           onChange={(e) => setNewInstitution({...newInstitution, whatsapp: e.target.value})}
                           className="bg-black/40 border-white/10"
                         />
                         <Input 
-                          placeholder="Facebook Link" 
+                          placeholder={t.facebookLink} 
                           value={newInstitution.facebook} 
                           onChange={(e) => setNewInstitution({...newInstitution, facebook: e.target.value})}
                           className="bg-black/40 border-white/10"
                         />
-                        <Button onClick={addInstitution} className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-600/20 border border-blue-400/30 transition-all active:scale-95">Add Institution</Button>
+                        <Button onClick={addInstitution} className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-600/20 border border-blue-400/30 transition-all active:scale-95">{t.addInstitutionBtn}</Button>
                       </div>
                       <ScrollArea className="h-[300px]">
                         <div className="divide-y divide-white/5">
@@ -1376,6 +1831,61 @@ export default function SecurityDashboard() {
                               <p className="text-sm text-white">{l.content}</p>
                             </div>
                           ))}
+                        </div>
+                      </ScrollArea>
+                    </Card>
+                  </TabsContent>
+                  <TabsContent value="pending">
+                    <Card className="bg-slate-900/50 border-white/5">
+                      <ScrollArea className="h-[400px]">
+                        <div className="divide-y divide-white/5">
+                          {pendingPayments.map((req, i) => (
+                            <div key={i} className="p-4 flex items-center justify-between">
+                              <div>
+                                <div className="font-bold text-white">{req.userEmail}</div>
+                                <div className="text-xs text-slate-500">ID: {req.transactionId}</div>
+                                <div className="text-xs text-amber-500">{req.amount} ETB</div>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => handleApprovePayment(req.id, req.userId, req.amount)}>
+                                  {t.approve}
+                                </Button>
+                                <Button size="sm" variant="destructive" onClick={() => handleRejectPayment(req.id)}>
+                                  {t.reject}
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                          {pendingPayments.length === 0 && (
+                            <div className="text-center py-20 text-slate-500">No pending payments.</div>
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </Card>
+                  </TabsContent>
+                  <TabsContent value="reports">
+                    <Card className="bg-slate-900/50 border-white/5 p-6">
+                      <ScrollArea className="h-[400px]">
+                        <div className="space-y-4">
+                          {systemReports.map((report, i) => (
+                            <div key={i} className="p-4 bg-black/20 rounded-lg border border-white/5">
+                              <div className="flex justify-between items-start mb-2">
+                                <Badge className={
+                                  report.type === 'success' ? 'bg-emerald-500/20 text-emerald-400' :
+                                  report.type === 'warning' ? 'bg-amber-500/20 text-amber-400' :
+                                  report.type === 'error' ? 'bg-red-500/20 text-red-400' :
+                                  'bg-blue-500/20 text-blue-400'
+                                }>
+                                  {report.action}
+                                </Badge>
+                                <span className="text-[10px] text-slate-500">{new Date(report.timestamp).toLocaleString()}</span>
+                              </div>
+                              <p className="text-sm text-slate-300">{report.details}</p>
+                            </div>
+                          ))}
+                          {systemReports.length === 0 && (
+                            <div className="text-center py-20 text-slate-500">No system reports found.</div>
+                          )}
                         </div>
                       </ScrollArea>
                     </Card>

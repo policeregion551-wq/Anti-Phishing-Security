@@ -17,9 +17,15 @@ export interface UserProfile {
   phone: string;
   email: string;
   isPro: boolean;
-  role: 'admin' | 'user';
+  role: 'admin' | 'user' | 'institution';
   createdAt: string;
   paymentStatus?: 'pending' | 'completed';
+  institutionLinks?: {
+    telegram?: string;
+    whatsapp?: string;
+    facebook?: string;
+    website?: string;
+  };
 }
 
 export interface ConnectionStatus {

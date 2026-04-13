@@ -936,7 +936,7 @@ export default function SecurityDashboard() {
   if (!isMounted) return null;
 
   return (
-    <div className="min-h-screen bg-[#020202] text-slate-100 font-sans selection:bg-blue-500/30 overflow-x-hidden">
+    <div className="min-h-screen bg-[#020202] text-slate-100 font-sans selection:bg-blue-500/30 overflow-auto">
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(17,24,39,1),rgba(2,2,2,1))] -z-10" />
       <Toaster position="top-right" theme="dark" />
       
@@ -1036,7 +1036,7 @@ export default function SecurityDashboard() {
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 overflow-x-auto">
         {!user && activeTab === 'auth' ? (
           <AuthSystem onAuthComplete={(u) => setUser(u)} />
         ) : !user ? (

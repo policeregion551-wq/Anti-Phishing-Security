@@ -18,9 +18,10 @@ export async function analyzeContent(content: string): Promise<AnalysisResult> {
   try {
     const ai = getAI();
     const result = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       contents: [{ role: 'user', parts: [{ text: `Analyze this content for phishing, malware, or scams: "${content}"` }] }],
       config: {
+        systemInstruction: "You are a cybersecurity expert. Analyze the provided content and return a JSON object indicating if it is safe, its threat score, threat type, reason, and recommendations.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -45,6 +46,10 @@ export async function analyzeContent(content: string): Promise<AnalysisResult> {
       }
     });
 
+    if (!result.text) {
+      throw new Error("AI returned an empty response");
+    }
+
     return JSON.parse(result.text) as AnalysisResult;
   } catch (error) {
     console.error("AI Analysis failed:", error);
@@ -67,7 +72,7 @@ export async function performSecurityAudit(target: string, type: string) {
   try {
     const ai = getAI();
     const result = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       contents: [{ role: 'user', parts: [{ text: `Perform a deep security audit for the following ${type}: ${target}. 
       Identify potential vulnerabilities, security risks, and provide a security score (0-100).` }] }],
       config: {
@@ -107,7 +112,7 @@ export async function verifyReceipt(imageBase64: string) {
   try {
     const ai = getAI();
     const result = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       contents: [
         {
           role: 'user',

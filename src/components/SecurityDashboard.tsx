@@ -227,7 +227,10 @@ const translations = {
     securityScore: "Security Score",
     receiptUploaded: "Receipt Uploaded",
     amountOnReceiptWarning: "Amount on receipt is less than required. Admin will review.",
-    autoVerificationFailed: "Auto-verification failed. Please enter Transaction ID manually."
+    autoVerificationFailed: "Auto-verification failed. Please enter Transaction ID manually.",
+    scannerInstruction: "Paste any suspicious message, link, or email content above. Our AI will analyze it for phishing, scams, or malware.",
+    auditInstruction: "Enter a website URL or a path to your source code. We will perform a deep security scan for vulnerabilities.",
+    socialInstruction: "Connect your social media profiles to enable real-time monitoring and protection against hacking attempts."
   },
   am: {
     dashboard: "ዳሽቦርድ",
@@ -336,7 +339,10 @@ const translations = {
     securityScore: "የደህንነት ውጤት",
     receiptUploaded: "ደረሰኝ ተጭኗል",
     amountOnReceiptWarning: "በደረሰኙ ላይ ያለው የገንዘብ መጠን ከሚፈለገው ያነሰ ነው። አድሚን ያረጋግጠዋል።",
-    autoVerificationFailed: "አውቶማቲክ ማረጋገጫ አልተሳካም። እባክዎን የግብይት መለያውን (Transaction ID) በእጅ ያስገቡ።"
+    autoVerificationFailed: "አውቶማቲክ ማረጋገጫ አልተሳካም። እባክዎን የግብይት መለያውን (Transaction ID) በእጅ ያስገቡ።",
+    scannerInstruction: "ማንኛውንም አጠራጣሪ መልዕክት፣ ሊንክ ወይም የኢሜል ይዘት ከላይ ይለጥፉ። የእኛ AI ለፊሺንግ፣ ለተንኮል አዘል ሶፍትዌሮች ወይም ለስካም ይመረምረዋል።",
+    auditInstruction: "የድረ-ገጽ ሊንክ (URL) ወይም የኮድ ፋይልዎን ያስገቡ። ጥልቅ የደህንነት ምርመራ እና የጥቃት ተጋላጭነት ፍተሻ እናደርጋለን።",
+    socialInstruction: "የማህበራዊ ሚዲያ አካውንቶችዎን በማገናኘት የቀጥታ ክትትል እና የሀክ ጥበቃ አገልግሎት ያግኙ።"
   }
 };
 
@@ -1025,22 +1031,29 @@ export default function SecurityDashboard() {
                 <Languages className="w-4 h-4" />
                 {lang === 'en' ? 'አማርኛ' : 'English'}
               </button>
+
               {user ? (
-                <div className="flex items-center gap-3">
-                  <div className="text-right hidden sm:block">
-                    <div className="text-xs font-bold text-white">{user.displayName || user.email.split('@')[0]}</div>
-                    <div className="text-[10px] text-slate-500">{user.email}</div>
-                  </div>
+                <div className="flex items-center gap-4">
                   <button 
                     onClick={handleLogout}
-                    className="h-8 w-8 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center overflow-hidden hover:border-red-500/50 transition-colors"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500 hover:text-white transition-all text-xs font-bold group"
                   >
-                    {user.photoURL ? (
-                      <img src={user.photoURL} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <Settings className="w-4 h-4 text-slate-400" />
-                    )}
+                    <LogOut className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+                    <span>{t.logout}</span>
                   </button>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right hidden sm:block">
+                      <div className="text-xs font-bold text-white">{user.displayName || user.email.split('@')[0]}</div>
+                      <div className="text-[10px] text-slate-500">{user.email}</div>
+                    </div>
+                    <div className="h-8 w-8 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center overflow-hidden">
+                      {user.photoURL ? (
+                        <img src={user.photoURL} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <Settings className="w-4 h-4 text-slate-400" />
+                      )}
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <Button size="sm" onClick={() => setActiveTab('auth')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-600/20 border border-blue-400/30 transition-all active:scale-95">
@@ -1178,23 +1191,29 @@ export default function SecurityDashboard() {
                   </Card>
                 </div>
 
-                <Card className="bg-slate-900/50 border-white/5 border-l-4 border-l-blue-500">
+                <Card className="bg-slate-900/50 border-white/5 border-l-4 border-l-blue-500 overflow-hidden relative">
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <Shield className="w-24 h-24 text-blue-500" />
+                  </div>
                   <CardHeader>
-                    <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                      <Zap className="w-5 h-5 text-blue-400 fill-blue-400" />
+                    <CardTitle className="text-lg font-semibold flex items-center gap-2 text-blue-400">
+                      <Zap className="w-5 h-5 fill-blue-400" />
                       {t.scanner}
                     </CardTitle>
+                    <CardDescription className="text-slate-400 text-xs italic">
+                      {t.scannerInstruction}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-col sm:flex-row gap-4">
                       <Input 
                         placeholder={t.placeholder} 
-                        className="bg-black/50 border-white/10 h-12 text-white"
+                        className="bg-black/50 border-white/10 h-12 text-white focus:border-blue-500/50 transition-all"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
                       />
-                      <Button className="h-12 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-600/20 border border-blue-400/30 transition-all active:scale-95" onClick={handleAnalyze} disabled={isAnalyzing || !input.trim()}>
+                      <Button className="h-12 px-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-600/20 border border-emerald-400/30 transition-all active:scale-95" onClick={handleAnalyze} disabled={isAnalyzing || !input.trim()}>
                         {isAnalyzing ? t.scanning : t.analyze}
                       </Button>
                     </div>
@@ -1298,17 +1317,17 @@ export default function SecurityDashboard() {
                 )}
                 <div className={!isPro && user?.email !== 'policeregion551@gmail.com' ? 'opacity-50 pointer-events-none' : ''}>
                   <div className="text-center space-y-4">
-                    <h2 className="text-4xl font-bold text-white">{t.scanner}</h2>
-                    <p className="text-slate-400">{t.placeholder}</p>
+                    <h2 className="text-4xl font-bold text-white tracking-tight">{t.scanner}</h2>
+                    <p className="text-slate-400 max-w-xl mx-auto">{t.scannerInstruction}</p>
                   </div>
-                  <Card className="bg-slate-900/50 border-white/5 p-8 mt-8">
+                  <Card className="bg-slate-900/50 border-white/5 p-8 mt-8 border-t-4 border-t-blue-500">
                     <textarea 
-                      className="w-full h-40 bg-black/50 border border-white/10 rounded-xl p-4 text-white outline-none resize-none"
+                      className="w-full h-40 bg-black/50 border border-white/10 rounded-xl p-4 text-white outline-none resize-none focus:border-blue-500/50 transition-all"
                       placeholder="Paste a suspicious message or URL here..."
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                     />
-                    <Button className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold mt-6 shadow-lg shadow-blue-600/20 border border-blue-400/30 transition-all active:scale-95" onClick={handleAnalyze} disabled={isAnalyzing || !input.trim()}>
+                    <Button className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold mt-6 shadow-lg shadow-emerald-600/20 border border-emerald-400/30 transition-all active:scale-95" onClick={handleAnalyze} disabled={isAnalyzing || !input.trim()}>
                       {isAnalyzing ? t.scanning : t.analyze}
                     </Button>
                   </Card>
@@ -1374,26 +1393,26 @@ export default function SecurityDashboard() {
                 )}
                 <div className={!isPro && user?.email !== 'policeregion551@gmail.com' ? 'opacity-50 pointer-events-none' : ''}>
                   <div className="text-center space-y-4">
-                    <h2 className="text-4xl font-bold text-white">{t.auditTitle}</h2>
-                    <p className="text-slate-400">{t.auditDesc}</p>
+                    <h2 className="text-4xl font-bold text-white tracking-tight">{t.auditTitle}</h2>
+                    <p className="text-slate-400 max-w-xl mx-auto">{t.auditInstruction}</p>
                   </div>
-                  <Card className="bg-slate-900/50 border-white/5 p-6 mt-8">
+                  <Card className="bg-slate-900/50 border-white/5 p-6 mt-8 border-t-4 border-t-purple-500">
                     <div className="flex flex-col md:flex-row gap-4">
                       <Input 
                         placeholder="https://example.com or project-folder/"
-                        className="bg-black/40 border-white/10 text-white h-12"
+                        className="bg-black/40 border-white/10 text-white h-12 focus:border-purple-500/50 transition-all"
                         value={auditTarget}
                         onChange={(e) => setAuditTarget(e.target.value)}
                       />
                       <select 
-                        className="bg-black/40 border-white/10 text-white rounded-md px-3 h-12"
+                        className="bg-black/40 border-white/10 text-white rounded-md px-3 h-12 outline-none focus:border-purple-500/50 transition-all"
                         value={auditType}
                         onChange={(e: any) => setAuditType(e.target.value)}
                       >
                         <option value="url">Website URL</option>
                         <option value="code">Source Code</option>
                       </select>
-                      <Button className="h-12 bg-blue-600 hover:bg-blue-700 px-8 text-white font-bold shadow-lg shadow-blue-600/20 border border-blue-400/30 transition-all active:scale-95" onClick={handleAudit} disabled={isAuditing}>
+                      <Button className="h-12 bg-purple-600 hover:bg-purple-700 px-8 text-white font-bold shadow-lg shadow-purple-600/20 border border-purple-400/30 transition-all active:scale-95" onClick={handleAudit} disabled={isAuditing}>
                         {isAuditing ? <RefreshCw className="animate-spin" /> : t.startAudit}
                       </Button>
                     </div>

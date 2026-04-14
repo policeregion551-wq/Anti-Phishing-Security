@@ -44,7 +44,8 @@ import {
   Building2,
   FileWarning,
   Copy,
-  LogOut
+  LogOut,
+  Menu
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -375,6 +376,7 @@ export default function SecurityDashboard() {
   const [lastAnalysis, setLastAnalysis] = useState<AnalysisResult | null>(null);
   const [systemReports, setSystemReports] = useState<any[]>([]);
   const [pendingPayments, setPendingPayments] = useState<any[]>([]);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const addSystemReport = async (action: string, details: string, type: 'info' | 'warning' | 'error' | 'success' = 'info') => {
     try {
@@ -967,7 +969,14 @@ export default function SecurityDashboard() {
       <nav className="border-b border-white/5 bg-black/60 backdrop-blur-2xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="md:hidden p-2 text-slate-400 hover:text-white transition-colors"
+              >
+                <Menu className="w-6 h-6" />
+              </button>
+              <div className="flex items-center gap-2">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(37,99,235,0.2)] border border-blue-400/20">
                 <Shield className="text-white w-6 h-6" />
               </div>
@@ -980,8 +989,9 @@ export default function SecurityDashboard() {
                 </div>
               </div>
             </div>
+          </div>
             
-            <div className="hidden md:flex items-center gap-6">
+          <div className="hidden md:flex items-center gap-6">
               <button 
                 onClick={() => setActiveTab('dashboard')}
                 className={`text-sm font-medium transition-colors ${activeTab === 'dashboard' ? 'text-blue-400' : 'text-slate-400 hover:text-white'}`}
@@ -1066,7 +1076,74 @@ export default function SecurityDashboard() {
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 overflow-x-auto">
+      <AnimatePresence>
+        {isMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0, x: -100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -100 }}
+            className="fixed inset-0 z-[60] md:hidden bg-slate-950/95 backdrop-blur-xl p-6 flex flex-col gap-6"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20">
+                  <Shield className="text-white w-6 h-6" />
+                </div>
+                <span className="text-xl font-bold text-white tracking-tight">BINI SHIELD</span>
+              </div>
+              <button onClick={() => setIsMenuOpen(false)} className="p-2 text-slate-400 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              {[
+                { id: 'dashboard', label: t.dashboard, icon: Activity },
+                { id: 'analysis', label: t.scanner, icon: Zap },
+                { id: 'audit', label: t.audit, icon: Search },
+                { id: 'connections', label: t.connections, icon: Link2 },
+                { id: 'pricing', label: t.upgrade, icon: CreditCard, hide: isPro },
+                { id: 'admin', label: t.admin, icon: Settings, show: user?.email === 'policeregion551@gmail.com' }
+              ].map((item) => (
+                (!item.hide && (item.show === undefined || item.show)) && (
+                  <button
+                    key={item.id}
+                    onClick={() => { setActiveTab(item.id); setIsMenuOpen(false); }}
+                    className={`flex items-center gap-4 p-4 rounded-xl transition-all ${activeTab === item.id ? 'bg-blue-600 text-white' : 'bg-white/5 text-slate-400'}`}
+                  >
+                    <item.icon className="w-5 h-5" />
+                    <span className="font-bold">{item.label}</span>
+                  </button>
+                )
+              ))}
+            </div>
+
+            <div className="mt-auto pt-6 border-t border-white/5 space-y-4">
+              <button 
+                onClick={() => { setLang(lang === 'en' ? 'am' : 'en'); setIsMenuOpen(false); }}
+                className="w-full p-4 rounded-xl bg-white/5 text-slate-400 flex items-center justify-between"
+              >
+                <div className="flex items-center gap-3">
+                  <Languages className="w-5 h-5" />
+                  <span className="font-bold">{lang === 'en' ? 'አማርኛ' : 'English'}</span>
+                </div>
+                <RefreshCw className="w-4 h-4" />
+              </button>
+              {user && (
+                <button 
+                  onClick={() => { handleLogout(); setIsMenuOpen(false); }}
+                  className="w-full p-4 rounded-xl bg-red-500/10 text-red-400 flex items-center gap-3 font-bold"
+                >
+                  <LogOut className="w-5 h-5" />
+                  <span>{t.logout}</span>
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 pb-24 md:pb-8">
         {!user && activeTab === 'auth' ? (
           <AuthSystem onAuthComplete={(u) => setUser(u)} />
         ) : !user ? (
@@ -1076,8 +1153,8 @@ export default function SecurityDashboard() {
               <Shield className="w-24 h-24 text-blue-500 mx-auto relative animate-pulse" />
             </div>
             <div className="space-y-4">
-              <h1 className="text-5xl font-bold text-white tracking-tight">Welcome to <span className="text-blue-500">BINI SHIELD AI</span></h1>
-              <p className="text-slate-400 max-w-md mx-auto text-lg">The most advanced AI-powered security system for your digital life.</p>
+              <h1 className="text-3xl sm:text-5xl font-bold text-white tracking-tight">Welcome to <span className="text-blue-500">BINI SHIELD AI</span></h1>
+              <p className="text-slate-400 max-w-md mx-auto text-base sm:text-lg">The most advanced AI-powered security system for your digital life.</p>
             </div>
             <Button size="lg" onClick={() => setActiveTab('auth')} className="bg-blue-600 hover:bg-blue-700 px-12 h-14 text-lg font-bold shadow-xl shadow-blue-600/20 border border-blue-400/30 text-white">
               Get Started
@@ -1321,9 +1398,9 @@ export default function SecurityDashboard() {
                     <h2 className="text-4xl font-bold text-white tracking-tight">{t.scanner}</h2>
                     <p className="text-slate-400 max-w-xl mx-auto">{t.scannerInstruction}</p>
                   </div>
-                  <Card className="bg-slate-900/50 border-white/5 p-8 mt-8 border-t-4 border-t-blue-500">
+                  <Card className="bg-slate-900/50 border-white/5 p-4 sm:p-8 mt-8 border-t-4 border-t-blue-500">
                     <textarea 
-                      className="w-full h-40 bg-black/50 border border-white/10 rounded-xl p-4 text-white outline-none resize-none focus:border-blue-500/50 transition-all"
+                      className="w-full h-32 sm:h-40 bg-black/50 border border-white/10 rounded-xl p-4 text-white outline-none resize-none focus:border-blue-500/50 transition-all"
                       placeholder="Paste a suspicious message or URL here..."
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
@@ -1397,7 +1474,7 @@ export default function SecurityDashboard() {
                     <h2 className="text-4xl font-bold text-white tracking-tight">{t.auditTitle}</h2>
                     <p className="text-slate-400 max-w-xl mx-auto">{t.auditInstruction}</p>
                   </div>
-                  <Card className="bg-slate-900/50 border-white/5 p-6 mt-8 border-t-4 border-t-purple-500">
+                  <Card className="bg-slate-900/50 border-white/5 p-4 sm:p-8 mt-8 border-t-4 border-t-purple-500">
                     <div className="flex flex-col md:flex-row gap-4">
                       <Input 
                         placeholder="https://example.com or project-folder/"
@@ -1436,11 +1513,11 @@ export default function SecurityDashboard() {
                         <Printer className="w-4 h-4 mr-2" /> {t.print}
                       </Button>
                     </CardHeader>
-                    <CardContent className="p-8 space-y-8">
-                      <div className="p-12 border-4 border-double border-blue-500/20 rounded-3xl text-center space-y-6">
-                        <h3 className="text-3xl font-serif italic text-white print:text-black">{t.certificate}</h3>
-                        <p className="text-slate-400 print:text-black">This document certifies that <strong>{currentAudit.target}</strong> has undergone a rigorous AI-driven security audit.</p>
-                        <div className="flex justify-center gap-8 py-4">
+                    <CardContent className="p-4 sm:p-8 space-y-8">
+                      <div className="p-6 sm:p-12 border-4 border-double border-blue-500/20 rounded-3xl text-center space-y-6">
+                        <h3 className="text-2xl sm:text-3xl font-serif italic text-white print:text-black">{t.certificate}</h3>
+                        <p className="text-slate-400 print:text-black text-sm sm:text-base">This document certifies that <strong>{currentAudit.target}</strong> has undergone a rigorous AI-driven security audit.</p>
+                        <div className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-8 py-4">
                           <div>
                             <div className="text-xs text-slate-500">Certificate ID</div>
                             <div className="font-bold text-white print:text-black flex items-center gap-2">
@@ -1780,14 +1857,16 @@ export default function SecurityDashboard() {
                   </Card>
                 )}
 
-                <Tabs defaultValue="users">
-                  <TabsList className="bg-slate-900 border-white/5">
-                    <TabsTrigger value="users">{t.users}</TabsTrigger>
-                    <TabsTrigger value="institutions">{t.institutions}</TabsTrigger>
-                    <TabsTrigger value="attacks">{t.attackReports}</TabsTrigger>
-                    <TabsTrigger value="pending">{t.pendingPayments}</TabsTrigger>
-                    <TabsTrigger value="reports">{t.reports}</TabsTrigger>
-                  </TabsList>
+                <Tabs defaultValue="users" className="w-full">
+                  <div className="overflow-x-auto pb-2 scrollbar-hide">
+                    <TabsList className="bg-slate-900 border-white/5 inline-flex min-w-full sm:min-w-0">
+                      <TabsTrigger value="users" className="whitespace-nowrap">{t.users}</TabsTrigger>
+                      <TabsTrigger value="institutions" className="whitespace-nowrap">{t.institutions}</TabsTrigger>
+                      <TabsTrigger value="attacks" className="whitespace-nowrap">{t.attackReports}</TabsTrigger>
+                      <TabsTrigger value="pending" className="whitespace-nowrap">{t.pendingPayments}</TabsTrigger>
+                      <TabsTrigger value="reports" className="whitespace-nowrap">{t.reports}</TabsTrigger>
+                    </TabsList>
+                  </div>
                   <TabsContent value="users" className="mt-6">
                     <Card className="bg-slate-900/50 border-white/5">
                       <ScrollArea className="h-[400px]">
@@ -1951,6 +2030,25 @@ export default function SecurityDashboard() {
           <div className="text-xs text-slate-600">© 2026 BINI SHIELD AI Security. All rights reserved.</div>
         </div>
       </footer>
+
+      {/* Mobile Bottom Navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950/90 backdrop-blur-lg border-t border-white/5 z-50 px-6 py-3 flex items-center justify-between">
+        {[
+          { id: 'dashboard', icon: Activity, label: t.dashboard },
+          { id: 'analysis', icon: Zap, label: t.scanner },
+          { id: 'audit', icon: Search, label: t.audit },
+          { id: 'connections', icon: Link2, label: t.connections }
+        ].map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id)}
+            className={`flex flex-col items-center gap-1 transition-all ${activeTab === item.id ? 'text-blue-500' : 'text-slate-500'}`}
+          >
+            <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'fill-blue-500/20' : ''}`} />
+            <span className="text-[10px] font-bold uppercase tracking-tighter">{item.label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -18,7 +18,7 @@ export async function analyzeContent(content: string): Promise<AnalysisResult> {
   try {
     const ai = getAI();
     const result = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: [{ role: 'user', parts: [{ text: `Analyze this content for phishing, malware, or scams: "${content}"` }] }],
       config: {
         systemInstruction: "You are a cybersecurity expert. Analyze the provided content and return a JSON object indicating if it is safe, its threat score, threat type, reason, and recommendations.",
@@ -47,10 +47,18 @@ export async function analyzeContent(content: string): Promise<AnalysisResult> {
     });
 
     if (!result.text) {
+      console.error("AI returned an empty response. Full result:", result);
       throw new Error("AI returned an empty response");
     }
 
-    return JSON.parse(result.text) as AnalysisResult;
+    try {
+      // Remove potential markdown code blocks if the AI includes them
+      const cleanText = result.text.replace(/```json\n?|\n?```/g, '').trim();
+      return JSON.parse(cleanText) as AnalysisResult;
+    } catch (parseError) {
+      console.error("Failed to parse AI response as JSON:", result.text);
+      throw new Error("Invalid AI response format");
+    }
   } catch (error) {
     console.error("AI Analysis failed:", error);
     return {
@@ -72,7 +80,7 @@ export async function performSecurityAudit(target: string, type: string) {
   try {
     const ai = getAI();
     const result = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: [{ role: 'user', parts: [{ text: `Perform a deep security audit for the following ${type}: ${target}. 
       Identify potential vulnerabilities, security risks, and provide a security score (0-100).` }] }],
       config: {
@@ -112,7 +120,7 @@ export async function verifyReceipt(imageBase64: string) {
   try {
     const ai = getAI();
     const result = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: [
         {
           role: 'user',

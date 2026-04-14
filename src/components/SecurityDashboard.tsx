@@ -1286,7 +1286,7 @@ export default function SecurityDashboard() {
 
             {activeTab === 'analysis' && (
               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-3xl mx-auto space-y-8">
-                {!isPro && (
+                {!isPro && user?.email !== 'policeregion551@gmail.com' && (
                   <div className="p-6 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center mb-8">
                     <Lock className="w-10 h-10 text-amber-500 mx-auto mb-4" />
                     <h3 className="text-xl font-bold text-white">{t.paymentRequired}</h3>
@@ -1296,7 +1296,7 @@ export default function SecurityDashboard() {
                     </Button>
                   </div>
                 )}
-                <div className={!isPro ? 'opacity-50 pointer-events-none' : ''}>
+                <div className={!isPro && user?.email !== 'policeregion551@gmail.com' ? 'opacity-50 pointer-events-none' : ''}>
                   <div className="text-center space-y-4">
                     <h2 className="text-4xl font-bold text-white">{t.scanner}</h2>
                     <p className="text-slate-400">{t.placeholder}</p>
@@ -1362,7 +1362,7 @@ export default function SecurityDashboard() {
 
             {activeTab === 'audit' && (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                {!isPro && (
+                {!isPro && user?.email !== 'policeregion551@gmail.com' && (
                   <div className="p-6 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center mb-8">
                     <Lock className="w-10 h-10 text-amber-500 mx-auto mb-4" />
                     <h3 className="text-xl font-bold text-white">{t.paymentRequired}</h3>
@@ -1372,7 +1372,7 @@ export default function SecurityDashboard() {
                     </Button>
                   </div>
                 )}
-                <div className={!isPro ? 'opacity-50 pointer-events-none' : ''}>
+                <div className={!isPro && user?.email !== 'policeregion551@gmail.com' ? 'opacity-50 pointer-events-none' : ''}>
                   <div className="text-center space-y-4">
                     <h2 className="text-4xl font-bold text-white">{t.auditTitle}</h2>
                     <p className="text-slate-400">{t.auditDesc}</p>

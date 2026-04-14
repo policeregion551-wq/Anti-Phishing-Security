@@ -43,7 +43,8 @@ import {
   Mail,
   Building2,
   FileWarning,
-  Copy
+  Copy,
+  LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 

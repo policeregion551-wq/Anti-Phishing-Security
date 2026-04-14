@@ -17,10 +17,10 @@ function getAI() {
 export async function analyzeContent(content: string): Promise<AnalysisResult> {
   try {
     const ai = getAI();
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const response = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: `Analyze this content for phishing, malware, or scams: "${content}"` }] }],
-      generationConfig: {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Analyze this content for phishing, malware, or scams: "${content}"`,
+      config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -45,8 +45,7 @@ export async function analyzeContent(content: string): Promise<AnalysisResult> {
       }
     });
 
-    const text = response.response.text();
-    return JSON.parse(text) as AnalysisResult;
+    return JSON.parse(response.text) as AnalysisResult;
   } catch (error) {
     console.error("AI Analysis failed:", error);
     return {
@@ -67,11 +66,11 @@ export async function analyzeContent(content: string): Promise<AnalysisResult> {
 export async function performSecurityAudit(target: string, type: string) {
   try {
     const ai = getAI();
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const response = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: `Perform a deep security audit for the following ${type}: ${target}. 
-      Identify potential vulnerabilities, security risks, and provide a security score (0-100).` }] }],
-      generationConfig: {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Perform a deep security audit for the following ${type}: ${target}. 
+      Identify potential vulnerabilities, security risks, and provide a security score (0-100).`,
+      config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -97,8 +96,7 @@ export async function performSecurityAudit(target: string, type: string) {
       }
     });
 
-    const text = response.response.text();
-    return JSON.parse(text);
+    return JSON.parse(response.text);
   } catch (error) {
     console.error("Audit failed:", error);
     throw error;
@@ -108,31 +106,26 @@ export async function performSecurityAudit(target: string, type: string) {
 export async function verifyReceipt(imageBase64: string) {
   try {
     const ai = getAI();
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const response = await model.generateContent({
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
       contents: [
         {
-          role: "user",
-          parts: [
-            {
-              inlineData: {
-                mimeType: "image/jpeg",
-                data: imageBase64
-              }
-            },
-            {
-              text: `Extract the following information from this Telebirr receipt image:
-              1. Transaction ID (usually starts with 'BINI' or a long alphanumeric string)
-              2. Amount Paid (in ETB)
-              3. Date of Transaction
-              4. Is it a valid Telebirr receipt? (true/false)
-              
-              Return the data in JSON format.`
-            }
-          ]
+          inlineData: {
+            mimeType: "image/jpeg",
+            data: imageBase64
+          }
+        },
+        {
+          text: `Extract the following information from this Telebirr receipt image:
+          1. Transaction ID (usually starts with 'BINI' or a long alphanumeric string)
+          2. Amount Paid (in ETB)
+          3. Date of Transaction
+          4. Is it a valid Telebirr receipt? (true/false)
+          
+          Return the data in JSON format.`
         }
       ],
-      generationConfig: {
+      config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -148,8 +141,7 @@ export async function verifyReceipt(imageBase64: string) {
       }
     });
 
-    const text = response.response.text();
-    return JSON.parse(text);
+    return JSON.parse(response.text);
   } catch (error) {
     console.error("Receipt verification failed:", error);
     throw error;

@@ -927,19 +927,20 @@ export default function SecurityDashboard() {
     try {
       const result = await analyzeContent(input);
       
-      await addDoc(collection(db, 'security_logs'), {
+      // Non-blocking logging
+      addDoc(collection(db, 'security_logs'), {
         userId: user.uid,
         timestamp: new Date().toISOString(),
         content: input,
         source: 'manual',
         result
-      });
+      }).catch(err => console.error("Failed to log security scan:", err));
 
-      await addSystemReport(
+      addSystemReport(
         'Manual Scan Performed',
         `User ${user.email} scanned content. Result: ${result.isSafe ? 'Safe' : 'Unsafe (' + result.threatType + ')'}`,
         result.isSafe ? 'info' : 'warning'
-      );
+      ).catch(err => console.error("Failed to add system report:", err));
       
       setLastAnalysis(result);
       setInput('');
@@ -952,6 +953,7 @@ export default function SecurityDashboard() {
         });
       }
     } catch (error) {
+      console.error("Analysis error:", error);
       toast.error("Analysis failed. Please try again.");
     } finally {
       setIsAnalyzing(false);

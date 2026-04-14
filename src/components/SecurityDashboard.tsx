@@ -1568,9 +1568,15 @@ export default function SecurityDashboard() {
                       initial={{ opacity: 0 }} 
                       animate={{ opacity: 1 }} 
                       exit={{ opacity: 0 }}
-                      className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+                      className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
                     >
-                      <Card className="w-full max-w-md bg-slate-900 border-white/10 shadow-2xl">
+                      <Card className="w-full max-w-md bg-slate-900 border-white/10 shadow-2xl my-auto relative">
+                        <button 
+                          onClick={() => setIsPaying(false)}
+                          className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white transition-colors z-10"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
                         <CardHeader className="text-center">
                           <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                             <Smartphone className="text-white w-8 h-8" />

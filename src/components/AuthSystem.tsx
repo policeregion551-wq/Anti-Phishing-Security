@@ -104,7 +104,10 @@ export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: 
       
       toast.success("Welcome back!");
       onAuthComplete({
-        ...userCredential.user,
+        uid: userCredential.user.uid,
+        email: userCredential.user.email,
+        displayName: userCredential.user.displayName,
+        photoURL: userCredential.user.photoURL,
         role: userData?.role || 'user',
         isPaid: userData?.isPaid || false
       });
@@ -116,7 +119,7 @@ export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: 
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 selection:bg-blue-500/30">
+    <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 selection:bg-blue-500/30 overflow-auto">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl shadow-[0_0_30px_rgba(37,99,235,0.3)] mb-4">

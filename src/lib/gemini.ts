@@ -17,8 +17,8 @@ function getAI() {
 export async function analyzeContent(content: string): Promise<AnalysisResult> {
   try {
     const ai = getAI();
-    const result = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
       contents: [{ role: 'user', parts: [{ text: `Analyze this content for phishing, malware, or scams: "${content}"` }] }],
       config: {
         systemInstruction: "You are a cybersecurity expert. Analyze the provided content and return a JSON object indicating if it is safe, its threat score, threat type, reason, and recommendations.",
@@ -46,17 +46,17 @@ export async function analyzeContent(content: string): Promise<AnalysisResult> {
       }
     });
 
-    if (!result.text) {
-      console.error("AI returned an empty response. Full result:", result);
+    if (!response.text) {
+      console.error("AI returned an empty response. Full response:", response);
       throw new Error("AI returned an empty response");
     }
 
     try {
       // Remove potential markdown code blocks if the AI includes them
-      const cleanText = result.text.replace(/```json\n?|\n?```/g, '').trim();
+      const cleanText = response.text.replace(/```json\n?|\n?```/g, '').trim();
       return JSON.parse(cleanText) as AnalysisResult;
     } catch (parseError) {
-      console.error("Failed to parse AI response as JSON:", result.text);
+      console.error("Failed to parse AI response as JSON:", response.text);
       throw new Error("Invalid AI response format");
     }
   } catch (error) {
@@ -79,8 +79,8 @@ export async function analyzeContent(content: string): Promise<AnalysisResult> {
 export async function performSecurityAudit(target: string, type: string) {
   try {
     const ai = getAI();
-    const result = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
       contents: [{ role: 'user', parts: [{ text: `Perform a deep security audit for the following ${type}: ${target}. 
       Identify potential vulnerabilities, security risks, and provide a security score (0-100).` }] }],
       config: {
@@ -109,7 +109,7 @@ export async function performSecurityAudit(target: string, type: string) {
       }
     });
 
-    return JSON.parse(result.text);
+    return JSON.parse(response.text);
   } catch (error) {
     console.error("Audit failed:", error);
     throw error;
@@ -119,8 +119,8 @@ export async function performSecurityAudit(target: string, type: string) {
 export async function verifyReceipt(imageBase64: string) {
   try {
     const ai = getAI();
-    const result = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
       contents: [
         {
           role: 'user',
@@ -159,7 +159,7 @@ export async function verifyReceipt(imageBase64: string) {
       }
     });
 
-    return JSON.parse(result.text);
+    return JSON.parse(response.text);
   } catch (error) {
     console.error("Receipt verification failed:", error);
     throw error;

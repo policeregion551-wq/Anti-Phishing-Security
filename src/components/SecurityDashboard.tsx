@@ -285,7 +285,7 @@ const translations = {
     findings: "የደህንነት ግኝቶች",
     certificate: "የደህንነት ማረጋገጫ",
     pass: "አልፏል",
-    fail: "አልወደቀም",
+    fail: "ወድቋል",
     warning: "ማስጠንቀቂያ",
     paymentRequired: "ክፍያ ያስፈልጋል",
     paymentDesc: "የደህንነት ስርዓቱን ለመጠቀም እና ሪፖርቶችን ለማየት መክፈል አለብዎት።",

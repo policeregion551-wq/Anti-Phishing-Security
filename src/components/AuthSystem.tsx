@@ -19,6 +19,11 @@ type AuthStep = 'register' | 'verify' | 'setPassword' | 'login';
 export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: any) => void }) {
   const [step, setStep] = useState<AuthStep>('register');
   const [loading, setLoading] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
   
   // Form States
   const [formData, setFormData] = useState({
@@ -83,19 +88,6 @@ export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: 
     e.preventDefault();
     setLoading(true);
 
-    // Hardcoded Admin Check for specific credentials
-    if (formData.email === 'policeregion551@gmail.com' && formData.password === 'Po12345@') {
-      toast.success("Admin Login Successful!");
-      onAuthComplete({
-        uid: 'admin-1',
-        email: 'policeregion551@gmail.com',
-        displayName: 'System Administrator',
-        role: 'admin'
-      });
-      setLoading(false);
-      return;
-    }
-
     try {
       const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
       // Fetch user role from Firestore
@@ -108,8 +100,8 @@ export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: 
         email: userCredential.user.email,
         displayName: userCredential.user.displayName,
         photoURL: userCredential.user.photoURL,
-        role: userData?.role || 'user',
-        isPaid: userData?.isPaid || false
+        role: userData?.role || (userCredential.user.email === 'policeregion551@gmail.com' ? 'admin' : 'user'),
+        isPaid: userData?.isPaid || (userCredential.user.email === 'policeregion551@gmail.com' ? true : false)
       });
     } catch (error: any) {
       toast.error("Invalid email or password");
@@ -117,6 +109,8 @@ export default function AuthSystem({ onAuthComplete }: { onAuthComplete: (user: 
       setLoading(false);
     }
   };
+
+  if (!isMounted) return null;
 
   return (
     <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 selection:bg-blue-500/30 overflow-auto">

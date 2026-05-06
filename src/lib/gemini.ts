@@ -112,7 +112,14 @@ export async function performSecurityAudit(target: string, type: string) {
     return JSON.parse(response.text);
   } catch (error) {
     console.error("Audit failed:", error);
-    throw error;
+    return {
+      status: 'failed',
+      score: 0,
+      findings: [
+        { severity: 'high', issue: 'Security audit failed due to technical error', fix: 'Please try again later or contact support.' }
+      ],
+      summary: "We could not complete the security audit at this time. For your safety, assume there are critical risks."
+    };
   }
 }
 
@@ -162,6 +169,12 @@ export async function verifyReceipt(imageBase64: string) {
     return JSON.parse(response.text);
   } catch (error) {
     console.error("Receipt verification failed:", error);
-    throw error;
+    return {
+      transactionId: 'N/A',
+      amount: 0,
+      date: new Date().toISOString(),
+      isValid: false,
+      reason: "Verification failed due to a technical error. Please check manually."
+    };
   }
 }

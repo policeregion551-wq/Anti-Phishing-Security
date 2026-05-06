@@ -18,7 +18,7 @@ export async function analyzeContent(content: string): Promise<AnalysisResult> {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash",
       contents: [{ role: 'user', parts: [{ text: `Analyze this content for phishing, malware, or scams: "${content}"` }] }],
       config: {
         systemInstruction: "You are a cybersecurity expert. Analyze the provided content and return a JSON object indicating if it is safe, its threat score, threat type, reason, and recommendations.",
@@ -80,7 +80,7 @@ export async function performSecurityAudit(target: string, type: string) {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash",
       contents: [{ role: 'user', parts: [{ text: `Perform a deep security audit for the following ${type}: ${target}. 
       Identify potential vulnerabilities, security risks, and provide a security score (0-100).` }] }],
       config: {
@@ -120,7 +120,7 @@ export async function verifyReceipt(imageBase64: string) {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash",
       contents: [
         {
           role: 'user',
